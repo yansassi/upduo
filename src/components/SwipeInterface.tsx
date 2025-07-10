@@ -194,7 +194,7 @@ export const SwipeInterface: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 p-4">
-      <div className="max-w-md mx-auto pt-8">
+      <div className="max-w-md mx-auto pt-8 pb-24">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
@@ -216,7 +216,7 @@ export const SwipeInterface: React.FC = () => {
         </AnimatePresence>
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-6 mt-8">
+        <div className="flex justify-center space-x-6 mt-8 mb-4">
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}

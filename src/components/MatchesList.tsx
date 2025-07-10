@@ -13,15 +13,18 @@ interface Match {
   profile: {
     id: string
     name: string
-    age: number
-    city: string
     current_rank: string
     favorite_heroes: string[]
     favorite_lines: string[]
+    avatar_url: string | null
   }
 }
 
-export const MatchesList: React.FC = () => {
+interface MatchesListProps {
+  onOpenChat: (matchId: string) => void
+}
+
+export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat }) => {
   const { user } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,7 +44,7 @@ export const MatchesList: React.FC = () => {
         .from('matches')
         .select(`
           *,
-          profile:profiles!matches_user2_id_fkey(*)
+          profile:profiles!matches_user2_id_fkey(id, name, current_rank, favorite_heroes, favorite_lines, avatar_url)
         `)
         .eq('user1_id', user.id)
         .order('created_at', { ascending: false })
@@ -55,7 +58,7 @@ export const MatchesList: React.FC = () => {
         .from('matches')
         .select(`
           *,
-          profile:profiles!matches_user1_id_fkey(*)
+          profile:profiles!matches_user1_id_fkey(id, name, current_rank, favorite_heroes, favorite_lines, avatar_url)
         `)
         .eq('user2_id', user.id)
         .order('created_at', { ascending: false })
@@ -113,20 +116,41 @@ export const MatchesList: React.FC = () => {
               key={match.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl p-6 shadow-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onOpenChat(match.id)}
+              className="bg-white rounded-xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-all relative"
             >
+              {/* Unread message indicator */}
+              {match.hasUnreadMessages && (
+                <div className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              )}
+              
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center overflow-hidden">
+                    {match.profile.avatar_url ? (
+                      <img
+                        src={match.profile.avatar_url}
+                        alt={match.profile.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onLoad={() => console.log('MatchesList: Avatar loaded successfully:', match.profile.avatar_url)}
+                        onError={() => console.error('MatchesList: Error loading avatar:', match.profile.avatar_url)}
+                      />
+                    ) : (
+                      <Users className="w-6 h-6 text-white" />
+                    )}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">
                       {match.profile.name}
                     </h3>
-                    <p className="text-sm text-gray-600">
-                      {match.profile.age} anos • {match.profile.city}
-                    </p>
+                    {match.lastMessage && (
+                      <p className="text-sm text-gray-500 truncate max-w-48">
+                        {match.lastMessage.message_text}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
@@ -142,19 +166,14 @@ export const MatchesList: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-end">
                 <div className="text-sm text-gray-600">
-                  Match em {new Date(match.created_at).toLocaleDateString('pt-BR')}
+                  {match.lastMessage ? (
+                    <>Última mensagem: {new Date(match.lastMessage.created_at).toLocaleDateString('pt-BR')}</>
+                  ) : (
+                    <>Match em {new Date(match.created_at).toLocaleDateString('pt-BR')}</>
+                  )}
                 </div>
-                
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Conversar</span>
-                </motion.button>
               </div>
             </motion.div>
           ))}

@@ -6,7 +6,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 console.log('Supabase Config:', {
   url: supabaseUrl,
   hasAnonKey: !!supabaseAnonKey,
-  anonKeyLength: supabaseAnonKey?.length
+  anonKeyLength: supabaseAnonKey?.length,
+  urlValid: supabaseUrl?.includes('supabase.co'),
+  keyValid: supabaseAnonKey?.startsWith('eyJ')
 })
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -18,6 +20,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export type Database = {
   public: {
     Tables: {
+      locations: {
+        Row: {
+          id: string
+          name: string
+          state_abbr: string
+          region: string
+        }
+        Insert: {
+          id: string
+          name: string
+          state_abbr: string
+          region: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          state_abbr?: string
+          region?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -29,6 +51,7 @@ export type Database = {
           favorite_heroes: string[]
           favorite_lines: string[]
           bio: string
+          avatar_url: string | null
           avatar_url: string | null
           created_at: string
           updated_at: string
@@ -90,18 +113,24 @@ export type Database = {
           user1_id: string
           user2_id: string
           created_at: string
+          user1_last_read_message_id: string | null
+          user2_last_read_message_id: string | null
         }
         Insert: {
           id?: string
           user1_id: string
           user2_id: string
           created_at?: string
+          user1_last_read_message_id?: string | null
+          user2_last_read_message_id?: string | null
         }
         Update: {
           id?: string
           user1_id?: string
           user2_id?: string
           created_at?: string
+          user1_last_read_message_id?: string | null
+          user2_last_read_message_id?: string | null
         }
       }
     }

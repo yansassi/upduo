@@ -1,0 +1,145 @@
+import { supabase } from '../lib/supabase'
+
+export interface State {
+  abbr: string
+  name: string
+}
+
+export interface City {
+  id: string
+  name: string
+  state_abbr: string
+  region: string
+}
+
+// Mapeamento de abreviações para nomes completos dos estados
+const STATE_NAMES: Record<string, string> = {
+  'AC': 'Acre',
+  'AL': 'Alagoas',
+  'AP': 'Amapá',
+  'AM': 'Amazonas',
+  'BA': 'Bahia',
+  'CE': 'Ceará',
+  'DF': 'Distrito Federal',
+  'ES': 'Espírito Santo',
+  'GO': 'Goiás',
+  'MA': 'Maranhão',
+  'MT': 'Mato Grosso',
+  'MS': 'Mato Grosso do Sul',
+  'MG': 'Minas Gerais',
+  'PA': 'Pará',
+  'PB': 'Paraíba',
+  'PR': 'Paraná',
+  'PE': 'Pernambuco',
+  'PI': 'Piauí',
+  'RJ': 'Rio de Janeiro',
+  'RN': 'Rio Grande do Norte',
+  'RS': 'Rio Grande do Sul',
+  'RO': 'Rondônia',
+  'RR': 'Roraima',
+  'SC': 'Santa Catarina',
+  'SP': 'São Paulo',
+  'SE': 'Sergipe',
+  'TO': 'Tocantins'
+}
+
+/**
+ * Busca todos os estados únicos disponíveis no banco de dados
+ */
+export const fetchStates = async (): Promise<State[]> => {
+  console.log('LocationUtils: fetchStates called')
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('state_abbr')
+      .order('state_abbr')
+
+    console.log('LocationUtils: fetchStates query result', { data, error })
+
+    if (error) throw error
+
+    // Remove duplicatas e cria array de estados
+    const uniqueStates = Array.from(new Set(data?.map(item => item.state_abbr) || []))
+    console.log('LocationUtils: unique states found', uniqueStates)
+    
+    const statesWithNames = uniqueStates.map(abbr => ({
+      abbr,
+      name: STATE_NAMES[abbr] || abbr
+    }))
+    
+    console.log('LocationUtils: states with names', statesWithNames)
+    return statesWithNames
+  } catch (error) {
+    console.error('Error fetching states:', error)
+    return []
+  }
+}
+
+/**
+ * Busca todas as cidades de um estado específico
+ */
+export const fetchCitiesByState = async (stateAbbr: string): Promise<City[]> => {
+  console.log('LocationUtils: fetchCitiesByState called with stateAbbr:', stateAbbr)
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('state_abbr', stateAbbr)
+      .order('name')
+
+    console.log('LocationUtils: fetchCitiesByState query result', { data, error, stateAbbr })
+
+    if (error) throw error
+
+    console.log('LocationUtils: cities found for state', stateAbbr, ':', data?.length || 0, 'cities')
+    return data || []
+  } catch (error) {
+    console.error('LocationUtils: Error fetching cities for state', stateAbbr, ':', error)
+    return []
+  }
+}
+
+/**
+ * Busca a abreviação do estado baseado no nome da cidade
+ */
+export const getStateAbbrByCity = async (cityName: string): Promise<string | null> => {
+  console.log('LocationUtils: getStateAbbrByCity called with cityName:', cityName)
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('state_abbr')
+      .eq('name', cityName)
+      .maybeSingle()
+
+    console.log('LocationUtils: getStateAbbrByCity query result', { data, error, cityName })
+
+    if (error) throw error
+
+    const result = data?.state_abbr || null
+    console.log('LocationUtils: state abbreviation found for city', cityName, ':', result)
+    return result
+  } catch (error) {
+    console.error('LocationUtils: Error getting state by city', cityName, ':', error)
+    return null
+  }
+}
+
+/**
+ * Busca uma cidade específica pelo nome
+ */
+export const getCityByName = async (cityName: string): Promise<City | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('name', cityName)
+      .maybeSingle()
+
+    if (error) throw error
+
+    return data
+  } catch (error) {
+    console.error('Error getting city by name:', error)
+    return null
+  }
+}

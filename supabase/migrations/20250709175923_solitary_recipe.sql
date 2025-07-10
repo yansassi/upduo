@@ -105,11 +105,12 @@ CREATE POLICY "Users can update their own profile"
   USING (auth.uid() = id);
 
 -- Create swipes policies
-CREATE POLICY "Users can view swipes they made"
+CREATE POLICY "Users can view relevant swipes for matching"
   ON swipes
   FOR SELECT
   TO authenticated
-  USING (auth.uid() = swiper_id);
+  USING (auth.uid() = swiper_id OR (auth.uid() = swiped_id AND is_like = true));
+
 
 CREATE POLICY "Users can insert their own swipes"
   ON swipes

@@ -5,7 +5,9 @@ import { ProfileSetup } from './components/ProfileSetup'
 import { SwipeInterface } from './components/SwipeInterface'
 import { MatchesList } from './components/MatchesList'
 import { ProfileView } from './components/ProfileView'
+import { ChatInterface } from './components/ChatInterface'
 import { Navigation } from './components/Navigation'
+import { MessagesDebugPanel } from './components/messages/MessagesDebugPanel'
 import { supabase } from './lib/supabase'
 
 function AppContent() {
@@ -13,6 +15,8 @@ function AppContent() {
   const [hasProfile, setHasProfile] = useState(false)
   const [activeTab, setActiveTab] = useState('discover')
   const [profileLoading, setProfileLoading] = useState(true)
+  const [currentChatMatch, setCurrentChatMatch] = useState<string | null>(null)
+  const [currentProfileToViewId, setCurrentProfileToViewId] = useState<string | null>(null)
 
   useEffect(() => {
     console.log('AppContent: User state changed', { user, loading })
@@ -49,6 +53,28 @@ function AppContent() {
     } finally {
       setProfileLoading(false)
     }
+  }
+
+  const handleOpenChat = (matchId: string) => {
+    console.log('App: Opening chat for match', matchId)
+    setCurrentChatMatch(matchId)
+    setCurrentProfileToViewId(null)
+  }
+
+  const handleCloseChat = () => {
+    console.log('App: Closing chat')
+    setCurrentChatMatch(null)
+  }
+
+  const handleViewProfile = (profileId: string) => {
+    console.log('App: Opening profile view for user', profileId)
+    setCurrentProfileToViewId(profileId)
+    setCurrentChatMatch(null)
+  }
+
+  const handleBackFromProfileView = () => {
+    console.log('App: Closing profile view')
+    setCurrentProfileToViewId(null)
   }
 
   // Show error state if there's an auth error
@@ -93,14 +119,35 @@ function AppContent() {
     return <ProfileSetup />
   }
 
+  // Show chat interface if a chat is open
+  if (currentChatMatch) {
+    return (
+      <ChatInterface 
+        matchId={currentChatMatch} 
+        onBack={handleCloseChat}
+        onViewProfile={handleViewProfile}
+      />
+    )
+  }
+
+  // Show profile view if viewing another user's profile
+  if (currentProfileToViewId) {
+    return (
+      <ProfileView 
+        profileId={currentProfileToViewId}
+        onBack={handleBackFromProfileView}
+      />
+    )
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'discover':
         return <SwipeInterface />
       case 'matches':
-        return <MatchesList />
+        return <MatchesList onOpenChat={handleOpenChat} />
       case 'profile':
-        return <ProfileView />
+        return <ProfileView profileId={user?.id} />
       default:
         return <SwipeInterface />
     }

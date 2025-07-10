@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, Calendar, Trophy, Sword, Target, Quote } from 'lucide-react'
+import { MapPin, Calendar, Trophy, Sword, Target, Quote, User } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 
 interface Profile {
@@ -12,6 +12,7 @@ interface Profile {
   favorite_heroes: string[]
   favorite_lines: string[]
   bio: string
+  avatar_url?: string | null
 }
 
 interface SwipeCardProps {
@@ -34,19 +35,41 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
       whileDrag={{ rotate: Math.random() * 10 - 5 }}
       className="w-full max-w-sm mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing"
     >
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold">{profile.name}</h2>
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm">{profile.age} anos</span>
+      {/* Large Profile Picture */}
+      <div className="relative h-80 bg-gradient-to-br from-blue-500 to-purple-600 overflow-hidden">
+        {profile.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt={profile.name}
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+            onLoad={() => console.log('SwipeCard: Profile image loaded successfully:', profile.avatar_url)}
+            onError={(e) => {
+              console.error('SwipeCard: Error loading profile image:', profile.avatar_url)
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <User className="w-24 h-24 text-white opacity-60" />
           </div>
-        </div>
+        )}
         
-        <div className="flex items-center space-x-2">
-          <MapPin className="w-4 h-4" />
-          <span className="text-sm">{profile.city}</span>
+        {/* Gradient overlay for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        
+        {/* Profile info overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <h2 className="text-3xl font-bold mb-2">{profile.name}</h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
+              <span className="text-sm">{profile.age} anos</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <MapPin className="w-4 h-4" />
+              <span className="text-sm">{profile.city}</span>
+            </div>
+          </div>
         </div>
       </div>
 

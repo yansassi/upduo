@@ -3,13 +3,35 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { HEROES, RANKS, LINES, getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
-import { fetchStates, fetchCitiesByState, State, City } from '../utils/locationUtils'
-import { User, MapPin, Calendar, Trophy, Sword, Target, Camera, Upload } from 'lucide-react'
+import { fetchStates, fetchCitiesByState, getStateAbbrByCity, State, City } from '../utils/locationUtils'
+import { User, MapPin, Calendar, Trophy, Sword, Target, X, Save, Camera, Upload } from 'lucide-react'
 
-export const ProfileSetup: React.FC = () => {
+interface Profile {
+  id: string
+  name: string
+  age: number
+  city: string
+  current_rank: string
+  favorite_heroes: string[]
+  favorite_lines: string[]
+  bio: string
+  avatar_url: string | null
+}
+
+interface ProfileEditFormProps {
+  initialProfile: Profile
+  onSave: () => void
+  onCancel: () => void
+}
+
+export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({ 
+  initialProfile, 
+  onSave, 
+  onCancel 
+}) => {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(1)
   const [states, setStates] = useState<State[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [selectedStateAbbr, setSelectedStateAbbr] = useState('')
@@ -17,14 +39,14 @@ export const ProfileSetup: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [profile, setProfile] = useState({
-    name: '',
-    age: '',
-    city: '',
+    name: initialProfile.name,
+    age: initialProfile.age.toString(),
+    city: initialProfile.city,
     state: '',
-    current_rank: '',
-    favorite_heroes: [] as string[],
-    favorite_lines: [] as string[],
-    bio: ''
+    current_rank: initialProfile.current_rank,
+    favorite_heroes: [...initialProfile.favorite_heroes],
+    favorite_lines: [...initialProfile.favorite_lines],
+    bio: initialProfile.bio || ''
   })
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,41 +76,75 @@ export const ProfileSetup: React.FC = () => {
   }
 
   useEffect(() => {
-    loadStates()
+    loadInitialData()
   }, [])
 
   useEffect(() => {
+    console.log('ProfileEditForm: useEffect for selectedStateAbbr triggered', { selectedStateAbbr })
     if (selectedStateAbbr) {
       loadCitiesByState(selectedStateAbbr)
     } else {
+      console.log('ProfileEditForm: No state selected, clearing cities')
       setCities([])
-      setProfile(prev => ({ ...prev, city: '' }))
     }
   }, [selectedStateAbbr])
 
-  const loadStates = async () => {
+  const loadInitialData = async () => {
+    console.log('ProfileEditForm: loadInitialData called')
+    
+    // Definir preview da imagem atual se existir
+    if (initialProfile.avatar_url) {
+      setAvatarPreviewUrl(initialProfile.avatar_url)
+    }
+    
+    // Carrega os estados
     const statesData = await fetchStates()
+    console.log('ProfileEditForm: states loaded', statesData)
     setStates(statesData)
+
+    // Se há uma cidade inicial, busca o estado correspondente
+    if (initialProfile.city) {
+      console.log('ProfileEditForm: Initial city found, searching for state:', initialProfile.city)
+      const stateAbbr = await getStateAbbrByCity(initialProfile.city)
+      console.log('ProfileEditForm: State abbreviation found for initial city:', stateAbbr)
+      if (stateAbbr) {
+        setSelectedStateAbbr(stateAbbr)
+        const selectedState = statesData.find(s => s.abbr === stateAbbr)
+        console.log('ProfileEditForm: Selected state object:', selectedState)
+        setProfile(prev => ({ 
+          ...prev, 
+          state: selectedState?.name || ''
+        }))
+      }
+    } else {
+      console.log('ProfileEditForm: No initial city found')
+    }
   }
 
   const loadCitiesByState = async (stateAbbr: string) => {
+    console.log('ProfileEditForm: loadCitiesByState called with:', stateAbbr)
     setLoadingCities(true)
     const citiesData = await fetchCitiesByState(stateAbbr)
+    console.log('ProfileEditForm: cities loaded for state', stateAbbr, ':', citiesData)
     setCities(citiesData)
     setLoadingCities(false)
   }
 
   const handleStateChange = (stateAbbr: string) => {
+    console.log('ProfileEditForm: handleStateChange called with:', stateAbbr)
     setSelectedStateAbbr(stateAbbr)
     const selectedState = states.find(s => s.abbr === stateAbbr)
+    console.log('ProfileEditForm: Selected state object in handleStateChange:', selectedState)
     setProfile(prev => ({ 
       ...prev, 
       state: selectedState?.name || '',
       city: '' // Reset city when state changes
     }))
+    console.log('ProfileEditForm: Profile updated after state change')
   }
 
   const handleCityChange = (cityName: string) => {
+    console.log('ProfileEditForm: handleCityChange called with:', cityName)
     setProfile(prev => ({ ...prev, city: cityName }))
   }
 
@@ -96,9 +152,8 @@ export const ProfileSetup: React.FC = () => {
     e.preventDefault()
     if (!user) return
 
-    console.log('ProfileSetup: Attempting to create profile', {
+    console.log('ProfileEditForm: Attempting to update profile', {
       userId: user.id,
-      email: user.email,
       profile: {
         ...profile,
         age: parseInt(profile.age)
@@ -107,12 +162,12 @@ export const ProfileSetup: React.FC = () => {
 
     setLoading(true)
     try {
-      let avatar_url = null
+      let avatar_url = initialProfile.avatar_url // Manter URL atual por padrão
       
-      // Upload da foto de perfil se selecionada
+      // Upload da nova foto de perfil se selecionada
       if (avatarFile) {
-        console.log('ProfileSetup: Uploading avatar file')
-        console.log('ProfileSetup: File details:', {
+        console.log('ProfileEditForm: Uploading new avatar file')
+        console.log('ProfileEditForm: File details:', {
           name: avatarFile.name,
           size: avatarFile.size,
           type: avatarFile.type
@@ -121,7 +176,7 @@ export const ProfileSetup: React.FC = () => {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${user.id}/avatar.${fileExt}`
         
-        console.log('ProfileSetup: Upload path:', fileName)
+        console.log('ProfileEditForm: Upload path:', fileName)
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('avatars')
@@ -130,22 +185,22 @@ export const ProfileSetup: React.FC = () => {
           })
         
         if (uploadError) {
-          console.error('ProfileSetup: Error uploading avatar', uploadError)
+          console.error('ProfileEditForm: Error uploading avatar', uploadError)
           throw uploadError
         }
         
-        console.log('ProfileSetup: Upload successful:', uploadData)
+        console.log('ProfileEditForm: Upload successful:', uploadData)
         
-        // Obter URL pública da imagem
+        // Obter URL pública da nova imagem
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName)
         
         avatar_url = publicUrl
-        console.log('ProfileSetup: Avatar uploaded successfully', avatar_url)
+        console.log('ProfileEditForm: New avatar uploaded successfully', avatar_url)
         
         // Validate URL format
-        console.log('ProfileSetup: URL validation:', {
+        console.log('ProfileEditForm: URL validation:', {
           isValidUrl: avatar_url.startsWith('http'),
           containsSupabase: avatar_url.includes('supabase'),
           containsAvatars: avatar_url.includes('avatars'),
@@ -156,9 +211,7 @@ export const ProfileSetup: React.FC = () => {
       
       const { data, error } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          email: user.email!,
+        .update({
           name: profile.name,
           age: parseInt(profile.age),
           city: profile.city,
@@ -166,26 +219,24 @@ export const ProfileSetup: React.FC = () => {
           favorite_heroes: profile.favorite_heroes,
           favorite_lines: profile.favorite_lines,
           bio: profile.bio,
-          avatar_url
-        }, {
-          onConflict: 'id'
+          avatar_url,
+          updated_at: new Date().toISOString()
         })
+        .eq('id', user.id)
         .select()
 
-      console.log('ProfileSetup: Profile creation result', { data, error })
+      console.log('ProfileEditForm: Profile update result', { data, error })
       
       if (error) {
-        console.error('ProfileSetup: Error creating profile', error)
+        console.error('ProfileEditForm: Error updating profile', error)
         throw error
       }
       
-      console.log('ProfileSetup: Profile created successfully, reloading page')
-      // Force a page reload to refresh the app state
-      window.location.reload()
+      console.log('ProfileEditForm: Profile updated successfully')
+      onSave()
     } catch (error) {
-      console.error('Error creating profile:', error)
-      // Show user-friendly error message
-      alert('Erro ao criar perfil. Tente novamente.')
+      console.error('Error updating profile:', error)
+      alert('Erro ao atualizar perfil. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -228,27 +279,37 @@ export const ProfileSetup: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 p-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8 pt-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Configure seu Perfil</h1>
-          <p className="text-blue-200">Vamos configurar seu perfil para encontrar o duo perfeito</p>
+          <div className="flex items-center justify-center space-x-4 mb-4">
+            <h1 className="text-4xl font-bold text-white">Editar Perfil</h1>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onCancel}
+              className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </motion.button>
+          </div>
+          <p className="text-blue-200">Atualize suas informações para melhorar seus matches</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* Progress Bar */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-blue-600">Passo {step + 1} de 5</span>
-              <span className="text-sm text-gray-500">{Math.round(((step + 1) / 5) * 100)}%</span>
+              <span className="text-sm font-medium text-blue-600">Passo {step} de 5</span>
+              <span className="text-sm text-gray-500">{Math.round((step / 5) * 100)}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((step + 1) / 5) * 100}%` }}
+                style={{ width: `${(step / 5) * 100}%` }}
               />
             </div>
           </div>
 
           <form onSubmit={handleSubmit}>
-            {step === 0 && (
+            {step === 1 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -285,29 +346,27 @@ export const ProfileSetup: React.FC = () => {
                   </div>
                   
                   <p className="text-gray-600 text-sm mb-4">
-                    Adicione uma foto para que outros jogadores possam te reconhecer
+                    {initialProfile.avatar_url ? 'Alterar foto de perfil' : 'Adicionar foto de perfil'}
                   </p>
                   
-                  {!avatarFile && (
-                    <label className="inline-flex items-center space-x-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
-                      <Upload className="w-4 h-4" />
-                      <span>Escolher Foto</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
+                  <label className="inline-flex items-center space-x-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span>{avatarFile ? 'Trocar Foto' : 'Escolher Foto'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                  </label>
                   
                   {avatarFile && (
-                    <div className="text-sm text-green-600 mb-4">
-                      ✓ Foto selecionada: {avatarFile.name}
+                    <div className="text-sm text-green-600 mt-2">
+                      ✓ Nova foto selecionada: {avatarFile.name}
                     </div>
                   )}
                   
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 mt-2">
                     Formatos aceitos: JPG, PNG, GIF • Tamanho máximo: 5MB
                   </p>
                 </div>
@@ -318,13 +377,13 @@ export const ProfileSetup: React.FC = () => {
                     onClick={nextStep}
                     className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
                   >
-                    {avatarFile ? 'Próximo' : 'Pular por Agora'}
+                    Próximo
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {step === 1 && (
+            {step === 2 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -420,7 +479,7 @@ export const ProfileSetup: React.FC = () => {
               </motion.div>
             )}
 
-            {step === 2 && (
+            {step === 3 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -475,7 +534,7 @@ export const ProfileSetup: React.FC = () => {
               </motion.div>
             )}
 
-            {step === 3 && (
+            {step === 4 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -534,7 +593,7 @@ export const ProfileSetup: React.FC = () => {
               </motion.div>
             )}
 
-            {step === 4 && (
+            {step === 5 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -597,9 +656,10 @@ export const ProfileSetup: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading || profile.favorite_lines.length === 0}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all disabled:opacity-50 flex items-center space-x-2"
                   >
-                    {loading ? 'Criando...' : 'Criar Perfil'}
+                    <Save className="w-4 h-4" />
+                    <span>{loading ? 'Salvando...' : 'Salvar Alterações'}</span>
                   </button>
                 </div>
               </motion.div>

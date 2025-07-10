@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, Calendar, Trophy, Sword, Target, Quote, User } from 'lucide-react'
+import { MapPin, Calendar, Trophy, Sword, Target, Quote, User, BadgeCheck } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 
 interface Profile {
@@ -26,9 +26,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={(_, info) => {
-        if (info.offset.x > 100) {
+        const threshold = 100
+        if (info.offset.x > threshold) {
           onSwipe('right')
-        } else if (info.offset.x < -100) {
+        } else if (info.offset.x < -threshold) {
           onSwipe('left')
         }
       }}
@@ -59,7 +60,12 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
         
         {/* Profile info overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-          <h2 className="text-3xl font-bold mb-2">{profile.name}</h2>
+          <div className="flex items-center mb-2">
+            <h2 className="text-3xl font-bold">{profile.name}</h2>
+            {profile.is_premium && (
+              <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
+            )}
+          </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4" />

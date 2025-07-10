@@ -52,7 +52,8 @@ export type Database = {
           favorite_lines: string[]
           bio: string
           avatar_url: string | null
-          avatar_url: string | null
+          is_premium: boolean
+          diamond_count: number
           created_at: string
           updated_at: string
         }
@@ -67,6 +68,8 @@ export type Database = {
           favorite_lines: string[]
           bio?: string
           avatar_url?: string | null
+          is_premium?: boolean
+          diamond_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -81,6 +84,8 @@ export type Database = {
           favorite_lines?: string[]
           bio?: string
           avatar_url?: string | null
+          is_premium?: boolean
+          diamond_count?: number
           updated_at?: string
         }
       }
@@ -131,6 +136,35 @@ export type Database = {
           created_at?: string
           user1_last_read_message_id?: string | null
           user2_last_read_message_id?: string | null
+        }
+      }
+      messages: {
+        Row: {
+          id: string
+          sender_id: string
+          receiver_id: string
+          message_text: string | null
+          message_type: string
+          diamond_count: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          receiver_id: string
+          message_text?: string | null
+          message_type?: string
+          diamond_count?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sender_id?: string
+          receiver_id?: string
+          message_text?: string | null
+          message_type?: string
+          diamond_count?: number | null
+          created_at?: string
         }
       }
     }

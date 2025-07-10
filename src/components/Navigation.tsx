@@ -1,18 +1,19 @@
 import React from 'react'
-import { Users, MessageCircle, User, Heart, LogOut } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import { useState } from 'react'
+import { Users, MessageCircle, User, Heart, Diamond } from 'lucide-react'
 
 interface NavigationProps {
   activeTab: string
   onTabChange: (tab: string) => void
+  hasAnyUnreadMessages?: boolean
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
-  const { signOut } = useAuth()
+export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange, hasAnyUnreadMessages = false }) => {
 
   const tabs = [
     { id: 'discover', label: 'Descobrir', icon: Users },
     { id: 'matches', label: 'Matches', icon: Heart },
+    { id: 'premium', label: 'Premium', icon: Diamond },
     { id: 'profile', label: 'Perfil', icon: User }
   ]
 
@@ -23,24 +24,20 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
           <button
             key={id}
             onClick={() => onTabChange(id)}
-            className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
               activeTab === id
-                ? 'text-blue-600 bg-blue-50'
-                : 'text-gray-600 hover:text-gray-800'
+                ? `${id === 'matches' && hasAnyUnreadMessages ? 'text-green-600 bg-green-50' : 'text-blue-600 bg-blue-50'}`
+                : `${id === 'matches' && hasAnyUnreadMessages ? 'text-green-600 hover:text-green-800' : 'text-gray-600 hover:text-gray-800'}`
             }`}
           >
             <Icon className="w-5 h-5" />
             <span className="text-xs font-medium">{label}</span>
+            {/* Unread indicator for matches tab */}
+            {id === 'matches' && hasAnyUnreadMessages && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+            )}
           </button>
         ))}
-        
-        <button
-          onClick={signOut}
-          className="flex flex-col items-center space-y-1 px-3 py-2 rounded-lg text-red-600 hover:text-red-800 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          <span className="text-xs font-medium">Sair</span>
-        </button>
       </div>
     </div>
   )

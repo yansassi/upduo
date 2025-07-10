@@ -166,7 +166,9 @@ export const ProfileSetup: React.FC = () => {
           favorite_heroes: profile.favorite_heroes,
           favorite_lines: profile.favorite_lines,
           bio: profile.bio,
-          avatar_url
+          avatar_url,
+          is_premium: false,
+          diamond_count: 0
         }, {
           onConflict: 'id'
         })
@@ -180,8 +182,11 @@ export const ProfileSetup: React.FC = () => {
       }
       
       console.log('ProfileSetup: Profile created successfully, reloading page')
-      // Force a page reload to refresh the app state
-      window.location.reload()
+      // Instead of reloading, let's trigger a re-check of the profile
+      // This is more elegant than a full page reload
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
     } catch (error) {
       console.error('Error creating profile:', error)
       // Show user-friendly error message

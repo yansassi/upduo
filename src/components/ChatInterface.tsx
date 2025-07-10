@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { ArrowLeft, Send, User, Trophy } from 'lucide-react'
+import { ArrowLeft, Send, User, Trophy, BadgeCheck, Diamond, Gift } from 'lucide-react'
 import { getRankImageUrl } from '../constants/gameData'
 
 interface Message {
@@ -25,6 +25,8 @@ interface Profile {
   favorite_heroes: string[]
   favorite_lines: string[]
   bio: string
+  is_premium: boolean
+  diamond_count: number
 }
 
 interface ChatInterfaceProps {
@@ -40,6 +42,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [showDiamondModal, setShowDiamondModal] = useState(false)
+  const [diamondAmount, setDiamondAmount] = useState(1)
+  const [userDiamonds, setUserDiamonds] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const subscriptionRef = useRef<any>(null)
 
@@ -127,7 +132,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
       // Get other user's profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, diamond_count')
         .eq('id', otherUserId)
         .single()
 
@@ -135,6 +140,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
 
       if (profileError) throw profileError
       setOtherProfile(profileData)
+
+      // Get current user's diamond count
+      const { data: currentUserData, error: currentUserError } = await supabase
+        .from('profiles')
+        .select('diamond_count')
+        .eq('id', user.id)
+        .single()
+
+      if (currentUserError) throw currentUserError
+      setUserDiamonds(currentUserData.diamond_count || 0)
 
       // Get messages between the two users
       const { data: messagesData, error: messagesError } = await supabase
@@ -270,6 +285,133 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
     }
   }
 
+  const sendDiamonds = async () => {
+    if (!user || !otherProfile || diamondAmount <= 0 || diamondAmount > userDiamonds) return
+
+    console.log('ChatInterface: Sending diamonds', {
+      senderId: user.id,
+      receiverId: otherProfile.id,
+      amount: diamondAmount
+    })
+
+    try {
+      // Start a transaction-like operation
+    setSending(true)
+      // 1. Get current diamond counts to ensure accuracy
+      const { data: senderData, error: senderFetchError } = await supabase
+        .from('profiles')
+        .select('diamond_count')
+        .eq('id', user.id)
+        .single()
+
+      if (senderFetchError) throw senderFetchError
+
+      const { data: receiverData, error: receiverFetchError } = await supabase
+        .from('profiles')
+        .select('diamond_count')
+        .eq('id', otherProfile.id)
+        .single()
+
+      if (receiverFetchError) throw receiverFetchError
+
+      const currentSenderDiamonds = senderData.diamond_count || 0
+      const currentReceiverDiamonds = receiverData.diamond_count || 0
+
+      console.log('ChatInterface: Current diamond counts', {
+        sender: currentSenderDiamonds,
+        receiver: currentReceiverDiamonds,
+        transferAmount: diamondAmount
+      })
+
+      // Validate sender has enough diamonds
+      if (currentSenderDiamonds < diamondAmount) {
+        throw new Error('Diamantes insuficientes')
+      }
+
+      // 2. Deduct diamonds from sender
+      const { error: deductError } = await supabase
+        .from('profiles')
+        .update({ 
+          diamond_count: currentSenderDiamonds - diamondAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (deductError) {
+        console.error('ChatInterface: Error deducting diamonds from sender:', deductError)
+        throw deductError
+      }
+
+      console.log('ChatInterface: Successfully deducted diamonds from sender')
+
+      // 3. Add diamonds to receiver
+      const { error: addError } = await supabase
+        .from('profiles')
+        .update({ 
+          diamond_count: currentReceiverDiamonds + diamondAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', otherProfile.id)
+
+      if (addError) {
+        console.error('ChatInterface: Error adding diamonds to receiver:', addError)
+        // Rollback: add diamonds back to sender
+        const { error: rollbackError } = await supabase
+          .from('profiles')
+          .update({ 
+            diamond_count: currentSenderDiamonds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id)
+        
+        if (rollbackError) {
+          console.error('ChatInterface: CRITICAL - Rollback failed:', rollbackError)
+        }
+        throw addError
+      }
+
+      console.log('ChatInterface: Successfully added diamonds to receiver')
+
+      // 4. Create diamond message
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: otherProfile.id,
+          message_type: 'diamond',
+          diamond_count: diamondAmount
+        })
+        .select()
+
+      if (messageError) {
+        console.error('Error creating diamond message:', messageError)
+        // Don't rollback the diamond transfer for message errors
+      }
+
+      // Update local state
+      setUserDiamonds(currentSenderDiamonds - diamondAmount)
+      setOtherProfile(prev => prev ? {
+        ...prev,
+        diamond_count: currentReceiverDiamonds + diamondAmount
+      } : null)
+
+      setShowDiamondModal(false)
+      setDiamondAmount(1)
+
+      console.log('ChatInterface: Diamonds sent successfully!', {
+        newSenderCount: currentSenderDiamonds - diamondAmount,
+        newReceiverCount: currentReceiverDiamonds + diamondAmount
+      })
+
+    } catch (error) {
+      console.error('Error sending diamonds:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      alert(`Erro ao enviar diamantes: ${errorMessage}`)
+    } finally {
+      setSending(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 flex items-center justify-center">
@@ -333,7 +475,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
               )}
             </div>
             
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">{otherProfile.name}</h2>
+            <div className="flex items-center mb-1">
+              <h2 className="text-lg font-semibold text-gray-800">{otherProfile.name}</h2>
+              {otherProfile.is_premium && (
+                <BadgeCheck className="w-4 h-4 text-blue-500 ml-1" />
+              )}
+            </div>
             <div className="flex items-center justify-center space-x-2">
               <img
                 src={getRankImageUrl(otherProfile.current_rank)}
@@ -360,15 +507,29 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
                 <div
                   className={`max-w-xs px-4 py-2 rounded-2xl ${
                     message.sender_id === user.id
-                      ? `bg-gradient-to-r from-blue-600 to-purple-600 text-white ${
+                      ? `${message.message_type === 'diamond' 
+                          ? 'bg-gradient-to-r from-yellow-500 to-orange-500' 
+                          : 'bg-gradient-to-r from-blue-600 to-purple-600'} text-white ${
                           message.isOptimistic ? 'opacity-70' : ''
                         }`
-                      : 'bg-white text-gray-800 shadow-md'
+                      : `${message.message_type === 'diamond' 
+                          ? 'bg-gradient-to-r from-yellow-100 to-orange-100 text-orange-800' 
+                          : 'bg-white text-gray-800'} shadow-md`
                   }`}
                 >
-                  <p className="text-sm">{message.message_text}</p>
+                  {message.message_type === 'diamond' ? (
+                    <div className="flex items-center space-x-2">
+                      <Diamond className="w-5 h-5" />
+                      <span className="font-semibold">{message.diamond_count} diamantes</span>
+                      <Gift className="w-4 h-4" />
+                    </div>
+                  ) : (
+                    <p className="text-sm">{message.message_text}</p>
+                  )}
                   <p className={`text-xs mt-1 ${
-                    message.sender_id === user.id ? 'text-blue-100' : 'text-gray-500'
+                    message.sender_id === user.id 
+                      ? message.message_type === 'diamond' ? 'text-yellow-100' : 'text-blue-100'
+                      : message.message_type === 'diamond' ? 'text-orange-600' : 'text-gray-500'
                   }`}>
                     {message.isOptimistic ? 'Enviando...' : new Date(message.created_at).toLocaleTimeString('pt-BR', {
                       hour: '2-digit',
@@ -399,6 +560,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
       {/* Message Input */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
         <div className="max-w-md mx-auto">
+          {/* Diamond counter */}
+          <div className="flex items-center justify-between mb-3 px-2">
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Diamond className="w-4 h-4 text-yellow-500" />
+              <span>Seus diamantes: {userDiamonds}</span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowDiamondModal(true)}
+              disabled={userDiamonds === 0}
+              className="flex items-center space-x-1 px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-full text-sm font-medium hover:from-yellow-600 hover:to-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Gift className="w-4 h-4" />
+              <span>Enviar</span>
+            </motion.button>
+          </div>
+          
           <form onSubmit={sendMessage} className="flex space-x-2">
             <input
               type="text"
@@ -421,6 +600,89 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
           </form>
         </div>
       </div>
+
+      {/* Diamond Sending Modal */}
+      <AnimatePresence>
+        {showDiamondModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Diamond className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Enviar Diamantes</h3>
+                <p className="text-gray-600">Para {otherProfile?.name}</p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantidade de diamantes
+                </label>
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setDiamondAmount(Math.max(1, diamondAmount - 1))}
+                    className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
+                  >
+                    -
+                  </button>
+                  <div className="flex-1 text-center">
+                    <input
+                      type="number"
+                      value={diamondAmount}
+                      onChange={(e) => setDiamondAmount(Math.max(1, Math.min(userDiamonds, parseInt(e.target.value) || 1)))}
+                      className="w-full text-center text-2xl font-bold border-none outline-none"
+                      min="1"
+                      max={userDiamonds}
+                    />
+                    <div className="flex items-center justify-center space-x-1 text-yellow-500">
+                      {[...Array(Math.min(5, diamondAmount))].map((_, i) => (
+                        <Diamond key={i} className="w-4 h-4" />
+                      ))}
+                      {diamondAmount > 5 && <span className="text-sm">+{diamondAmount - 5}</span>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDiamondAmount(Math.min(userDiamonds, diamondAmount + 1))}
+                    className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  Você tem {userDiamonds} diamantes disponíveis
+                </p>
+              </div>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowDiamondModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={sendDiamonds}
+                  disabled={diamondAmount <= 0 || diamondAmount > userDiamonds || sending}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  <Gift className="w-4 h-4" />
+                  <span>{sending ? 'Enviando...' : 'Enviar'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

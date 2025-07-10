@@ -16,6 +16,8 @@ interface Profile {
   favorite_lines: string[]
   bio: string
   avatar_url: string | null
+  is_premium: boolean
+  diamond_count: number
 }
 
 interface ProfileEditFormProps {

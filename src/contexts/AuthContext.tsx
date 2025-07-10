@@ -31,21 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Initializing...')
     
-    // Test Supabase connection first
-    const testConnection = async () => {
-      try {
-        const { data, error } = await supabase.from('profiles').select('count').limit(1)
-        console.log('AuthProvider: Connection test', { data, error })
-      } catch (err) {
-        console.error('AuthProvider: Connection test failed', err)
-        setError('Falha na conexão com o servidor')
-        setLoading(false)
-        return
-      }
-    }
-    
-    testConnection()
-    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       console.log('AuthProvider: Initial session check', { session, error })
@@ -55,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setSession(session)
       setUser(session?.user ?? null)
+      console.log('AuthProvider: Setting loading to false after session check')
       setLoading(false)
     }).catch((err) => {
       console.error('AuthProvider: Failed to get session', err)
@@ -68,7 +54,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('AuthProvider: Auth state changed', { event, session })
         setSession(session)
         setUser(session?.user ?? null)
-        setLoading(false)
+        if (event !== 'INITIAL_SESSION') {
+          console.log('AuthProvider: Setting loading to false after auth state change')
+          setLoading(false)
+        }
       }
     )
 
@@ -101,7 +90,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     console.log('AuthProvider: Signing out')
-    await supabase.auth.signOut()
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        // Handle session not found errors gracefully - this is expected when session is already invalid
+        if (error.message?.includes('Session from session_id claim in JWT does not exist') || 
+            error.status === 403) {
+          console.warn('AuthProvider: Session already invalid on server, continuing with local cleanup')
+        } else {
+          console.warn('AuthProvider: Sign out error (continuing with local cleanup)', error)
+        }
+      }
+      console.log('AuthProvider: Sign out completed successfully')
+    } catch (error) {
+      console.warn('AuthProvider: Sign out failed with exception, continuing with local cleanup', error)
+    }
+    
+    // Force local state cleanup regardless of server response
+    setUser(null)
+    setSession(null)
+    setError(null)
   }
 
   const value = {

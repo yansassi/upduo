@@ -5,9 +5,9 @@ import { ProfileSetup } from './components/ProfileSetup'
 import { SwipeInterface } from './components/SwipeInterface'
 import { MatchesList } from './components/MatchesList'
 import { ProfileView } from './components/ProfileView'
+import { PremiumArea } from './components/PremiumArea'
 import { ChatInterface } from './components/ChatInterface'
 import { Navigation } from './components/Navigation'
-import { MessagesDebugPanel } from './components/messages/MessagesDebugPanel'
 import { supabase } from './lib/supabase'
 
 function AppContent() {
@@ -17,6 +17,7 @@ function AppContent() {
   const [profileLoading, setProfileLoading] = useState(true)
   const [currentChatMatch, setCurrentChatMatch] = useState<string | null>(null)
   const [currentProfileToViewId, setCurrentProfileToViewId] = useState<string | null>(null)
+  const [hasAnyUnreadMessages, setHasAnyUnreadMessages] = useState(false)
 
   useEffect(() => {
     console.log('AppContent: User state changed', { user, loading })
@@ -26,18 +27,20 @@ function AppContent() {
   const checkProfile = async () => {
     console.log('AppContent: Checking profile for user', user?.id)
     if (!user) {
+      console.log('AppContent: No user found, setting profileLoading to false')
       setProfileLoading(false)
       return
     }
 
     try {
+      console.log('AppContent: Starting profile check query...')
       const { data, error, count } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', user.id)
         .maybeSingle()
 
-      console.log('AppContent: Profile check result', { data, error })
+      console.log('AppContent: Profile check result', { data, error, count, hasData: !!data })
       
       if (error) {
         console.error('AppContent: Profile check failed with unexpected error', error)
@@ -51,6 +54,7 @@ function AppContent() {
       console.error('AppContent: Profile check failed with exception', error)
       setHasProfile(false)
     } finally {
+      console.log('AppContent: Setting profileLoading to false')
       setProfileLoading(false)
     }
   }
@@ -145,7 +149,9 @@ function AppContent() {
       case 'discover':
         return <SwipeInterface />
       case 'matches':
-        return <MatchesList onOpenChat={handleOpenChat} />
+        return <MatchesList onOpenChat={handleOpenChat} onUnreadStatusChange={setHasAnyUnreadMessages} />
+      case 'premium':
+        return <PremiumArea />
       case 'profile':
         return <ProfileView profileId={user?.id} />
       default:
@@ -156,7 +162,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {renderContent()}
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} hasAnyUnreadMessages={hasAnyUnreadMessages} />
     </div>
   )
 }

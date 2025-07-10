@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ProfileEditForm } from './ProfileEditForm'
-import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle } from 'lucide-react'
+import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle, BadgeCheck, LogOut } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 
 interface Profile {
@@ -25,13 +25,14 @@ interface ProfileViewProps {
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) => {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -123,6 +124,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
     setIsEditing(false)
   }
 
+  const handleSignOut = async () => {
+    if (isSigningOut) return
+    
+    setIsSigningOut(true)
+    console.log('ProfileView: Starting sign out process')
+    
+    try {
+      await signOut()
+      console.log('ProfileView: Sign out completed')
+    } catch (error) {
+      console.error('ProfileView: Sign out failed', error)
+    } finally {
+      setIsSigningOut(false)
+    }
+  }
   const handleImageLoad = () => {
     console.log('ProfileView: Image loaded successfully:', profile?.avatar_url)
     setImageError(false)
@@ -257,7 +273,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <h1 className="text-4xl font-bold mb-3 drop-shadow-lg">{profile.name}</h1>
+                <div className="flex items-center justify-center mb-3">
+                  <h1 className="text-4xl font-bold drop-shadow-lg">{profile.name}</h1>
+                  {profile.is_premium && (
+                    <BadgeCheck className="w-8 h-8 text-blue-400 ml-2 drop-shadow-lg" />
+                  )}
+                </div>
                 <div className="flex items-center space-x-6 text-lg">
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-5 h-5" />
@@ -378,7 +399,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
-            className="p-6 bg-gray-50"
+            className="p-6 bg-gray-50 space-y-4"
           >
             <div className="text-center">
               <p className="text-sm text-gray-500">
@@ -389,6 +410,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                 })}
               </p>
             </div>
+            
+            {/* Logout button - only show on own profile */}
+            {isOwnProfile && (
+              <div className="pt-4 border-t border-gray-200">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-all disabled:opacity-50"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>{isSigningOut ? 'Saindo...' : 'Sair da Conta'}</span>
+                </motion.button>
+              </div>
+            )}
           </motion.div>
         </div>
       </div>

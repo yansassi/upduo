@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { SwipeCard } from './SwipeCard'
-import { Heart, X, Sparkles, Users } from 'lucide-react'
+import { Heart, X, Sparkles, Users, Clock, Crown } from 'lucide-react'
+import { useSwipeLimits, incrementSwipeCount } from '../hooks/useSwipeLimits'
 
 interface Profile {
   id: string
@@ -14,6 +15,7 @@ interface Profile {
   favorite_heroes: string[]
   favorite_lines: string[]
   bio: string
+  is_premium: boolean
 }
 
 export const SwipeInterface: React.FC = () => {
@@ -22,15 +24,29 @@ export const SwipeInterface: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [matchFound, setMatchFound] = useState<Profile | null>(null)
+  const swipeLimits = useSwipeLimits()
 
   useEffect(() => {
     fetchProfiles()
   }, [user])
 
+  // Pré-carregar mais perfis quando estiver próximo do fim
+  useEffect(() => {
+    const shouldPreload = currentIndex >= profiles.length - 2 && 
+                         profiles.length > 0 && 
+                         !loading
+    
+    if (shouldPreload) {
+      console.log('SwipeInterface: Pre-loading more profiles')
+      fetchMoreProfiles()
+    }
+  }, [currentIndex, profiles.length, loading])
+
   const fetchProfiles = async () => {
     if (!user) return
 
     console.log('SwipeInterface: Fetching profiles for user', user.id)
+    setLoading(true)
 
     try {
       // Get profiles that haven't been swiped yet
@@ -61,18 +77,60 @@ export const SwipeInterface: React.FC = () => {
 
       console.log('SwipeInterface: Fetched profiles', { profiles, error })
 
-      if (error) throw error
-      setProfiles(profiles || [])
+      if (error) {
+        console.error('SwipeInterface: Error fetching profiles', error)
+        // Don't throw, just set empty array
+        setProfiles([])
+      } else {
+        setProfiles(profiles || [])
+      }
     } catch (error) {
       console.error('Error fetching profiles:', error)
+      setProfiles([])
     } finally {
       setLoading(false)
     }
   }
 
+  const fetchMoreProfiles = async () => {
+    if (!user) return
+
+    try {
+      // Get profiles that haven't been swiped yet
+      const { data: swipedProfiles } = await supabase
+        .from('swipes')
+        .select('swiped_id')
+        .eq('swiper_id', user.id)
+
+      const swipedIds = swipedProfiles?.map(s => s.swiped_id) || []
+      const loadedIds = profiles.map(p => p.id)
+      const excludedIds = [...swipedIds, ...loadedIds]
+      
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', user.id)
+        .limit(5) // Carregar menos perfis por vez
+
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`)
+      }
+
+      const { data: newProfiles, error } = await query
+
+      if (error) throw error
+      
+      if (newProfiles && newProfiles.length > 0) {
+        setProfiles(prev => [...prev, ...newProfiles])
+        console.log('SwipeInterface: Added', newProfiles.length, 'more profiles')
+      }
+    } catch (error) {
+      console.error('Error fetching more profiles:', error)
+    }
+  }
+
   const handleSwipe = async (direction: 'left' | 'right') => {
     if (!user || currentIndex >= profiles.length) return
-
     const swipedProfile = profiles[currentIndex]
     const isLike = direction === 'right'
 
@@ -160,6 +218,12 @@ export const SwipeInterface: React.FC = () => {
       // Move to next profile
       console.log('SwipeInterface: Moving to next profile')
       setCurrentIndex(currentIndex + 1)
+
+      // Increment swipe count after successful swipe
+      const swipeCountUpdated = await incrementSwipeCount(user.id)
+      if (!swipeCountUpdated) {
+        console.warn('SwipeInterface: Failed to update swipe count')
+      }
     } catch (error) {
       console.error('Error handling swipe:', error)
       // Show user-friendly error message
@@ -195,18 +259,17 @@ export const SwipeInterface: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 p-4">
       <div className="max-w-md mx-auto pt-8 pb-24">
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
         </div>
-
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentIndex}
+            key={currentProfile.id}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
           >
             <SwipeCard
               profile={currentProfile}
@@ -221,7 +284,12 @@ export const SwipeInterface: React.FC = () => {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => handleSwipe('left')}
-            className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
+            disabled={!swipeLimits.canSwipe}
+            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+              !swipeLimits.canSwipe
+                ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
           >
             <X className="w-8 h-8 text-white" />
           </motion.button>
@@ -230,11 +298,70 @@ export const SwipeInterface: React.FC = () => {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => handleSwipe('right')}
-            className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition-colors"
+            disabled={!swipeLimits.canSwipe}
+            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+              !swipeLimits.canSwipe
+                ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                : 'bg-green-500 hover:bg-green-600'
+            }`}
           >
             <Heart className="w-8 h-8 text-white" />
           </motion.button>
         </div>
+
+        {/* No swipes left overlay */}
+        {!swipeLimits.canSwipe && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-2xl p-8 max-w-md w-full text-center"
+            >
+              <div className="relative mb-6">
+                <Clock className="w-16 h-16 mx-auto text-red-500" />
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Limite Atingido!</h2>
+              <p className="text-gray-600 mb-6">
+                Você usou todos os seus swipes de hoje. Assine Premium por apenas{' '}
+                <span className="font-bold text-green-600">R$ 25</span> e tenha{' '}
+                <span className="font-bold text-blue-600">swipes ilimitados</span>!
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    // Em produção, isso abriria o fluxo de pagamento
+                    alert('Redirecionando para pagamento... (Em desenvolvimento)')
+                  }}
+                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all flex items-center justify-center space-x-2"
+                >
+                  <Crown className="w-5 h-5" />
+                  <span>Assinar Premium - R$ 25</span>
+                </button>
+                
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full bg-gray-500 text-white py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all"
+                >
+                  Voltar Amanhã
+                </button>
+              </div>
+              
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                <p className="text-xs text-gray-600">
+                  ✨ Premium inclui: Swipes ilimitados, badge verificado e prioridade nos matches!
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </div>
 
       {/* Match Modal */}

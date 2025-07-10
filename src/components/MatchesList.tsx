@@ -34,9 +34,10 @@ interface Match {
 interface MatchesListProps {
   onOpenChat: (matchId: string) => void
   onUnreadStatusChange?: (hasUnread: boolean) => void
+  refreshTrigger?: number
 }
 
-export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadStatusChange }) => {
+export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadStatusChange, refreshTrigger }) => {
   const { user } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +46,14 @@ export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadSt
     console.log('MatchesList: Component mounted, fetching matches')
     fetchMatches()
   }, [user])
+
+  // Refresh matches when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      console.log('MatchesList: Refresh trigger activated, refetching matches')
+      fetchMatches()
+    }
+  }, [refreshTrigger])
 
   const fetchMatches = async () => {
     if (!user) return
@@ -130,6 +139,21 @@ export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadSt
         processedMatches.push(processedMatch)
       }
       
+      // Sort matches by latest message timestamp (most recent first)
+      processedMatches.sort((a, b) => {
+        // Matches with messages come first
+        if (a.hasMessages && !b.hasMessages) return -1
+        if (!a.hasMessages && b.hasMessages) return 1
+        
+        // If both have messages, sort by latest message timestamp
+        if (a.lastMessage && b.lastMessage) {
+          return new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime()
+        }
+        
+        // If neither has messages, sort by match creation date
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      
       console.log('MatchesList: Processed matches with unread status', processedMatches)
       setMatches(processedMatches)
       
@@ -167,7 +191,7 @@ export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadSt
     )
   }
 
-  // Separate matches into initiated and uninitiated
+  // Separate matches into initiated and uninitiated (already sorted by latest message)
   const uninitiatedMatches = matches.filter(match => !match.hasMessages)
   const initiatedMatches = matches.filter(match => match.hasMessages)
 
@@ -273,9 +297,17 @@ export const MatchesList: React.FC<MatchesListProps> = ({ onOpenChat, onUnreadSt
                           )}
                         </div>
                         {match.lastMessage && (
-                          <p className="text-sm text-gray-500 truncate max-w-48">
-                            {match.lastMessage.message_text}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm text-gray-500 truncate max-w-40">
+                              {match.lastMessage.message_text || 'Mensagem'}
+                            </p>
+                            <span className="text-xs text-gray-400">
+                              {new Date(match.lastMessage.created_at).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>

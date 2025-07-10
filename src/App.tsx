@@ -18,6 +18,7 @@ function AppContent() {
   const [currentChatMatch, setCurrentChatMatch] = useState<string | null>(null)
   const [currentProfileToViewId, setCurrentProfileToViewId] = useState<string | null>(null)
   const [hasAnyUnreadMessages, setHasAnyUnreadMessages] = useState(false)
+  const [matchesRefreshTrigger, setMatchesRefreshTrigger] = useState(0)
 
   useEffect(() => {
     console.log('AppContent: User state changed', { user, loading })
@@ -68,6 +69,11 @@ function AppContent() {
   const handleCloseChat = () => {
     console.log('App: Closing chat')
     setCurrentChatMatch(null)
+  }
+
+  const handleMessageSent = () => {
+    console.log('App: Message sent, refreshing matches list')
+    setMatchesRefreshTrigger(prev => prev + 1)
   }
 
   const handleViewProfile = (profileId: string) => {
@@ -130,6 +136,7 @@ function AppContent() {
         matchId={currentChatMatch} 
         onBack={handleCloseChat}
         onViewProfile={handleViewProfile}
+        onMessageSent={handleMessageSent}
       />
     )
   }
@@ -149,7 +156,11 @@ function AppContent() {
       case 'discover':
         return <SwipeInterface />
       case 'matches':
-        return <MatchesList onOpenChat={handleOpenChat} onUnreadStatusChange={setHasAnyUnreadMessages} />
+        return <MatchesList 
+          onOpenChat={handleOpenChat} 
+          onUnreadStatusChange={setHasAnyUnreadMessages}
+          refreshTrigger={matchesRefreshTrigger}
+        />
       case 'premium':
         return <PremiumArea />
       case 'profile':

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ProfileEditForm } from './ProfileEditForm'
-import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle, BadgeCheck, LogOut } from 'lucide-react'
+import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle, BadgeCheck, LogOut, Diamond, Wallet, X, MessageSquare } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 
 interface Profile {
@@ -17,6 +17,8 @@ interface Profile {
   bio: string
   created_at: string
   avatar_url: string | null
+  diamond_count: number
+  is_premium: boolean
 }
 
 interface ProfileViewProps {
@@ -33,6 +35,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
   const [imageLoading, setImageLoading] = useState(true)
   const [debugInfo, setDebugInfo] = useState<any>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -46,7 +49,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, diamond_count, is_premium')
         .eq('id', targetUserId)
         .maybeSingle()
 
@@ -138,6 +141,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
     } finally {
       setIsSigningOut(false)
     }
+  }
+
+  const handleWithdrawal = () => {
+    const whatsappNumber = '5545988349638'
+    const message = encodeURIComponent(`Olá! Gostaria de sacar ${profile?.diamond_count} diamantes da minha conta no ML Duo. Pode me ajudar?`)
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`
+    window.open(whatsappUrl, '_blank')
+    setShowWithdrawalModal(false)
   }
   const handleImageLoad = () => {
     console.log('ProfileView: Image loaded successfully:', profile?.avatar_url)
@@ -314,6 +325,60 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
             </div>
           </motion.div>
 
+          {/* Diamonds Section - Only show on own profile */}
+          {isOwnProfile && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <Diamond className="w-6 h-6 text-yellow-600" />
+                  <h3 className="text-xl font-bold text-gray-800">Seus Diamantes</h3>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Diamond className="w-8 h-8 text-yellow-500" />
+                  <span className="text-3xl font-bold text-gray-800">{profile.diamond_count || 0}</span>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-gray-600 text-sm">
+                  Converta seus diamantes em diamantes do Mobile Legends!
+                </p>
+                
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowWithdrawalModal(true)}
+                  disabled={!profile.diamond_count || profile.diamond_count < 165}
+                  className={`w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+                    profile.diamond_count >= 165
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Wallet className="w-5 h-5" />
+                  <span>Sacar Diamantes</span>
+                </motion.button>
+                
+                <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
+                  <div className="flex items-center space-x-2 text-yellow-800">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Saque mínimo: 165 diamantes</span>
+                  </div>
+                  {profile.diamond_count < 165 && (
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Você precisa de mais {165 - profile.diamond_count} diamantes para sacar
+                    </p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Heroes Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -429,6 +494,84 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
           </motion.div>
         </div>
       </div>
+
+      {/* Withdrawal Modal */}
+      <AnimatePresence>
+        {showWithdrawalModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white rounded-2xl p-8 max-w-md w-full relative"
+            >
+              <button
+                onClick={() => setShowWithdrawalModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Wallet className="w-10 h-10 text-white" />
+                </div>
+                
+                <h3 className="text-2xl font-bold text-gray-800 mb-4">Sacar Diamantes</h3>
+                <div className="bg-yellow-50 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <Diamond className="w-6 h-6 text-yellow-600" />
+                    <span className="text-2xl font-bold text-gray-800">{profile?.diamond_count}</span>
+                    <span className="text-gray-600">diamantes</span>
+                  </div>
+                  <p className="text-sm text-gray-600">Disponíveis para saque</p>
+                </div>
+                
+                <p className="text-gray-600 mb-6 leading-relaxed">
+                  Para sacar seus diamantes e convertê-los em diamantes do Mobile Legends, 
+                  entre em contato com nosso desenvolvedor via WhatsApp.
+                </p>
+                
+                <div className="space-y-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleWithdrawal}
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition-all flex items-center justify-center space-x-3"
+                  >
+                    <MessageSquare className="w-6 h-6" />
+                    <span>Chamar no WhatsApp</span>
+                  </motion.button>
+                  
+                  <button
+                    onClick={() => setShowWithdrawalModal(false)}
+                    className="w-full bg-gray-200 text-gray-800 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                
+                <div className="mt-6 p-4 bg-blue-50 rounded-xl">
+                  <div className="flex items-center justify-center space-x-2 text-blue-800 mb-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Informações importantes:</span>
+                  </div>
+                  <div className="text-xs text-blue-700 space-y-1">
+                    <p>• Saque mínimo: 165 diamantes</p>
+                    <p>• Conversão 1:1 para diamantes ML</p>
+                    <p>• Processamento em até 24h</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

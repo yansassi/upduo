@@ -33,9 +33,10 @@ interface ChatInterfaceProps {
   matchId: string
   onBack: () => void
   onViewProfile: (profileId: string) => void
+  onMessageSent?: () => void
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, onViewProfile }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, onViewProfile, onMessageSent }) => {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
@@ -217,6 +218,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
               return prev
             }
           })
+          
+          // Notify parent component that a message was received
+          if (onMessageSent && newMessage.sender_id !== user!.id) {
+            onMessageSent()
+          }
         }
       )
       .subscribe((status) => {
@@ -268,6 +274,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
 
       if (error) throw error
 
+      // Notify parent component that a message was sent
+      if (onMessageSent) {
+        onMessageSent()
+      }
+      
       // A mensagem real será adicionada via realtime subscription
       // e substituirá a mensagem otimística
     } catch (error) {
@@ -398,6 +409,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
       setShowDiamondModal(false)
       setDiamondAmount(1)
 
+      // Notify parent component that a message was sent
+      if (onMessageSent) {
+        onMessageSent()
+      }
+      
       console.log('ChatInterface: Diamonds sent successfully!', {
         newSenderCount: currentSenderDiamonds - diamondAmount,
         newReceiverCount: currentReceiverDiamonds + diamondAmount
@@ -441,9 +457,80 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900">
       {/* Header */}
-      <div className="bg-white shadow-lg p-4">
+      <div className="fixed top-0 left-0 right-0 bg-white shadow-lg z-50 border-b border-gray-100">
+        <div className="max-w-md mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Left side - Back button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onBack}
+              className="p-2.5 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </motion.button>
+            
+            {/* Center - Profile info */}
+            <motion.div 
+              className="flex-1 mx-4 cursor-pointer"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onViewProfile(otherProfile.id)}
+            >
+              <div className="flex items-center space-x-3">
+                {/* Avatar */}
+                <div className="relative">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
+                    {otherProfile.avatar_url ? (
+                      <img
+                        src={otherProfile.avatar_url}
+                        alt={otherProfile.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onLoad={() => console.log('ChatInterface: Avatar loaded successfully:', otherProfile.avatar_url)}
+                        onError={() => console.error('ChatInterface: Error loading avatar:', otherProfile.avatar_url)}
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-white" />
+                    )}
+                  </div>
+                  {/* Online indicator */}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white"></div>
+                </div>
+                
+                {/* Name and rank info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-1.5 mb-0.5">
+                    <h2 className="text-lg font-semibold text-gray-800 truncate">{otherProfile.name}</h2>
+                    {otherProfile.is_premium && (
+                      <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <img
+                      src={getRankImageUrl(otherProfile.current_rank)}
+                      alt={otherProfile.current_rank}
+                      className="w-4 h-4 flex-shrink-0"
+                    />
+                    <span className="text-sm text-gray-600 font-medium truncate">{otherProfile.current_rank}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            
+            {/* Right side - Menu button (optional) */}
+            <div className="w-10 flex justify-end">
+              {/* Placeholder for future menu button */}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Old header code removed */}
+      {/* 
+      <div className="fixed top-0 left-0 right-0 bg-white shadow-lg p-4 z-50">
         <div className="max-w-md mx-auto flex items-center space-x-4">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -491,10 +578,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
             </div>
           </motion.div>
         </div>
-      </div>
+      </div> 
+      */}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 pb-20">
+      <div className="pt-20 pb-32 overflow-y-auto p-4 min-h-screen">
         <div className="max-w-md mx-auto space-y-4">
           <AnimatePresence>
             {messages.map((message) => (

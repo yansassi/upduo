@@ -134,6 +134,9 @@ export const SwipeInterface: React.FC = () => {
     const swipedProfile = profiles[currentIndex]
     const isLike = direction === 'right'
 
+    // Scroll to top when swiping
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+
     console.log('SwipeInterface: Handling swipe', {
       direction,
       isLike,
@@ -331,14 +334,16 @@ export const SwipeInterface: React.FC = () => {
               <p className="text-gray-600 mb-6">
                 Você usou todos os seus swipes de hoje. Assine Premium por apenas{' '}
                 <span className="font-bold text-green-600">R$ 25</span> e tenha{' '}
-                <span className="font-bold text-blue-600">swipes ilimitados</span>!
+                <span className="font-bold text-blue-600">100 swipes por dia</span>!
               </p>
               
               <div className="space-y-3">
                 <button
                   onClick={() => {
-                    // Em produção, isso abriria o fluxo de pagamento
-                    alert('Redirecionando para pagamento... (Em desenvolvimento)')
+                    const whatsappNumber = '5545988349638'
+                    const message = encodeURIComponent('Olá! Quero ser premium do UpDuo. Pode me ajudar com a assinatura?')
+                    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`
+                    window.open(whatsappUrl, '_blank')
                   }}
                   className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all flex items-center justify-center space-x-2"
                 >
@@ -356,7 +361,7 @@ export const SwipeInterface: React.FC = () => {
               
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                 <p className="text-xs text-gray-600">
-                  ✨ Premium inclui: Swipes ilimitados, badge verificado e prioridade nos matches!
+                  ✨ Premium inclui: 100 swipes por dia, badge verificado e prioridade nos matches!
                 </p>
               </div>
             </motion.div>

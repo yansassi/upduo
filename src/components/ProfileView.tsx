@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { ProfileEditForm } from './ProfileEditForm'
 import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle, BadgeCheck, LogOut, Diamond, Wallet, X, MessageSquare } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
+import { DiamondPurchase } from './DiamondPurchase'
 
 interface Profile {
   id: string
@@ -31,6 +32,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [showDiamondPurchase, setShowDiamondPurchase] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [debugInfo, setDebugInfo] = useState<any>(null)
@@ -207,6 +209,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
     )
   }
 
+  if (showDiamondPurchase) {
+    return (
+      <DiamondPurchase
+        onBack={() => setShowDiamondPurchase(false)}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900">
       <div className="max-w-md mx-auto pb-20">
@@ -335,11 +345,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <Diamond className="w-6 h-6 text-yellow-600" />
+                  <span className="text-2xl">💎</span>
                   <h3 className="text-xl font-bold text-gray-800">Seus Diamantes</h3>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Diamond className="w-8 h-8 text-yellow-500" />
+                  <span className="text-3xl">💎</span>
                   <span className="text-3xl font-bold text-gray-800">{profile.diamond_count || 0}</span>
                 </div>
               </div>
@@ -362,6 +372,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                 >
                   <Wallet className="w-5 h-5" />
                   <span>Sacar Diamantes</span>
+                </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowDiamondPurchase(true)}
+                  className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
+                >
+                  <span className="text-lg">💎</span>
+                  <span>Comprar Diamantes</span>
                 </motion.button>
                 
                 <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
@@ -435,7 +455,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                   <img
                     src={getLineImageUrl(line)}
                     alt={line}
-                    className="w-16 h-16 mx-auto rounded-xl shadow-lg mb-2"
+                    className="w-16 h-16 mx-auto rounded-xl shadow-lg mb-2 bg-transparent"
                   />
                   <p className="text-sm font-medium text-gray-700 capitalize">{line}</p>
                 </motion.div>
@@ -482,6 +502,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    const whatsappNumber = '5545988349638'
+                    const message = encodeURIComponent('Olá! Preciso de ajuda com o ML Duo. Pode me ajudar?')
+                    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`
+                    window.open(whatsappUrl, '_blank')
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-all mb-3"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span>Suporte WhatsApp</span>
+                </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleSignOut}
                   disabled={isSigningOut}
                   className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-all disabled:opacity-50"
@@ -519,13 +554,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
 
               <div className="text-center">
                 <div className="w-20 h-20 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Wallet className="w-10 h-10 text-white" />
+                  <span className="text-4xl">💎</span>
                 </div>
                 
                 <h3 className="text-2xl font-bold text-gray-800 mb-4">Sacar Diamantes</h3>
                 <div className="bg-yellow-50 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-center space-x-2 mb-2">
-                    <Diamond className="w-6 h-6 text-yellow-600" />
+                    <span className="text-2xl">💎</span>
                     <span className="text-2xl font-bold text-gray-800">{profile?.diamond_count}</span>
                     <span className="text-gray-600">diamantes</span>
                   </div>

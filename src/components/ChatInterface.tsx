@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { ArrowLeft, Send, User, Trophy, BadgeCheck, Diamond, Gift } from 'lucide-react'
+import { ArrowLeft, Send, User, Trophy, BadgeCheck, Diamond, Gift, Flag } from 'lucide-react'
 import { getRankImageUrl } from '../constants/gameData'
+import { ReportModal } from './ReportModal'
 
 interface Message {
   id: string
@@ -46,6 +47,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
   const [showDiamondModal, setShowDiamondModal] = useState(false)
   const [diamondAmount, setDiamondAmount] = useState(1)
   const [userDiamonds, setUserDiamonds] = useState(0)
+  const [showReportModal, setShowReportModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const subscriptionRef = useRef<any>(null)
 
@@ -305,86 +307,37 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
       amount: diamondAmount
     })
 
-    try {
-      // Start a transaction-like operation
     setSending(true)
-      // 1. Get current diamond counts to ensure accuracy
-      const { data: senderData, error: senderFetchError } = await supabase
-        .from('profiles')
-        .select('diamond_count')
-        .eq('id', user.id)
-        .single()
+    try {
+      // 1. Chama a função segura de transferência de diamantes
+      console.log('ChatInterface: Calling transfer_diamonds function...')
+      const { data: transferResult, error: transferError } = await supabase
+        .rpc('transfer_diamonds', {
+          p_sender_id: user.id,
+          p_receiver_id: otherProfile.id,
+          p_amount: diamondAmount
+        })
 
-      if (senderFetchError) throw senderFetchError
+      console.log('ChatInterface: Transfer function result:', { transferResult, transferError })
 
-      const { data: receiverData, error: receiverFetchError } = await supabase
-        .from('profiles')
-        .select('diamond_count')
-        .eq('id', otherProfile.id)
-        .single()
+      if (transferError) {
+        console.error('ChatInterface: Error calling transfer function:', transferError)
+        throw new Error(`Erro na transferência: ${transferError.message}`)
+      }
 
-      if (receiverFetchError) throw receiverFetchError
+      if (!transferResult?.success) {
+        console.error('ChatInterface: Transfer failed:', transferResult?.error)
+        throw new Error(transferResult?.error || 'Falha na transferência de diamantes')
+      }
 
-      const currentSenderDiamonds = senderData.diamond_count || 0
-      const currentReceiverDiamonds = receiverData.diamond_count || 0
-
-      console.log('ChatInterface: Current diamond counts', {
-        sender: currentSenderDiamonds,
-        receiver: currentReceiverDiamonds,
-        transferAmount: diamondAmount
+      console.log('ChatInterface: Transfer successful!', {
+        transactionId: transferResult.transaction_id,
+        senderNewBalance: transferResult.sender_new_balance,
+        receiverNewBalance: transferResult.receiver_new_balance
       })
 
-      // Validate sender has enough diamonds
-      if (currentSenderDiamonds < diamondAmount) {
-        throw new Error('Diamantes insuficientes')
-      }
-
-      // 2. Deduct diamonds from sender
-      const { error: deductError } = await supabase
-        .from('profiles')
-        .update({ 
-          diamond_count: currentSenderDiamonds - diamondAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
-
-      if (deductError) {
-        console.error('ChatInterface: Error deducting diamonds from sender:', deductError)
-        throw deductError
-      }
-
-      console.log('ChatInterface: Successfully deducted diamonds from sender')
-
-      // 3. Add diamonds to receiver
-      const { error: addError } = await supabase
-        .from('profiles')
-        .update({ 
-          diamond_count: currentReceiverDiamonds + diamondAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', otherProfile.id)
-
-      if (addError) {
-        console.error('ChatInterface: Error adding diamonds to receiver:', addError)
-        // Rollback: add diamonds back to sender
-        const { error: rollbackError } = await supabase
-          .from('profiles')
-          .update({ 
-            diamond_count: currentSenderDiamonds,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id)
-        
-        if (rollbackError) {
-          console.error('ChatInterface: CRITICAL - Rollback failed:', rollbackError)
-        }
-        throw addError
-      }
-
-      console.log('ChatInterface: Successfully added diamonds to receiver')
-
-      // 4. Create diamond message
-      const { error: messageError } = await supabase
+      // 2. Criar mensagem de diamante no chat
+      const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
@@ -392,32 +345,49 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
           message_type: 'diamond',
           diamond_count: diamondAmount
         })
-        .select()
+        .select('id')
+        .single()
 
       if (messageError) {
         console.error('Error creating diamond message:', messageError)
-        // Don't rollback the diamond transfer for message errors
+        // Não fazer rollback da transferência por erro de mensagem - os diamantes já foram transferidos
+        console.log('ChatInterface: Diamond transfer completed successfully despite message error')
       }
 
-      // Update local state
-      setUserDiamonds(currentSenderDiamonds - diamondAmount)
+      // 3. Vincular a mensagem à transação (se a mensagem foi criada)
+      if (transferResult.transaction_id && messageData?.id) {
+        const { error: transactionUpdateError } = await supabase
+          .from('transactions')
+          .update({
+            related_message_id: messageData.id
+          })
+          .eq('id', transferResult.transaction_id)
+
+        if (transactionUpdateError) {
+          console.error('ChatInterface: Error linking message to transaction:', transactionUpdateError)
+        }
+      }
+
+      // 4. Atualizar estado local com os novos saldos
+      setUserDiamonds(transferResult.sender_new_balance)
       setOtherProfile(prev => prev ? {
         ...prev,
-        diamond_count: currentReceiverDiamonds + diamondAmount
+        diamond_count: transferResult.receiver_new_balance
       } : null)
 
+      // 5. Fechar modal e resetar formulário
       setShowDiamondModal(false)
       setDiamondAmount(1)
 
-      // Notify parent component that a message was sent
+      // 6. Notificar componente pai que uma mensagem foi enviada
       if (onMessageSent) {
         onMessageSent()
       }
       
-      console.log('ChatInterface: Diamonds sent successfully!', {
-        newSenderCount: currentSenderDiamonds - diamondAmount,
-        newReceiverCount: currentReceiverDiamonds + diamondAmount
-      })
+      // 7. Mostrar mensagem de sucesso
+      alert(`✅ ${diamondAmount} diamantes enviados com sucesso para ${otherProfile.name}!`)
+
+      console.log('ChatInterface: Diamond transfer completed successfully!')
 
     } catch (error) {
       console.error('Error sending diamonds:', error)
@@ -522,64 +492,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
             
             {/* Right side - Menu button (optional) */}
             <div className="w-10 flex justify-end">
-              {/* Placeholder for future menu button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowReportModal(true)}
+                className="p-2.5 bg-red-50 rounded-full hover:bg-red-100 transition-colors flex-shrink-0"
+                title="Denunciar usuário"
+              >
+                <Flag className="w-5 h-5 text-red-600" />
+              </motion.button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Old header code removed */}
-      {/* 
-      <div className="fixed top-0 left-0 right-0 bg-white shadow-lg p-4 z-50">
-        <div className="max-w-md mx-auto flex items-center space-x-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onBack}
-            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </motion.button>
-          
-          <motion.div 
-            className="flex-1 cursor-pointer text-center"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onViewProfile(otherProfile.id)}
-          >
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-2 overflow-hidden">
-              {otherProfile.avatar_url ? (
-                <img
-                  src={otherProfile.avatar_url}
-                  alt={otherProfile.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                  onLoad={() => console.log('ChatInterface: Avatar loaded successfully:', otherProfile.avatar_url)}
-                  onError={() => console.error('ChatInterface: Error loading avatar:', otherProfile.avatar_url)}
-                />
-              ) : (
-                <User className="w-8 h-8 text-white" />
-              )}
-            </div>
-            
-            <div className="flex items-center mb-1">
-              <h2 className="text-lg font-semibold text-gray-800">{otherProfile.name}</h2>
-              {otherProfile.is_premium && (
-                <BadgeCheck className="w-4 h-4 text-blue-500 ml-1" />
-              )}
-            </div>
-            <div className="flex items-center justify-center space-x-2">
-              <img
-                src={getRankImageUrl(otherProfile.current_rank)}
-                alt={otherProfile.current_rank}
-                className="w-4 h-4"
-              />
-              <span className="text-sm text-gray-600">{otherProfile.current_rank}</span>
-            </div>
-          </motion.div>
-        </div>
-      </div> 
-      */}
 
       {/* Messages */}
       <div className="pt-20 pb-32 overflow-y-auto p-4 min-h-screen">
@@ -607,7 +532,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
                 >
                   {message.message_type === 'diamond' ? (
                     <div className="flex items-center space-x-2">
-                      <Diamond className="w-5 h-5" />
+                      <span className="text-lg">💎</span>
                       <span className="font-semibold">{message.diamond_count} diamantes</span>
                       <Gift className="w-4 h-4" />
                     </div>
@@ -651,7 +576,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
           {/* Diamond counter */}
           <div className="flex items-center justify-between mb-3 px-2">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Diamond className="w-4 h-4 text-yellow-500" />
+              <span className="text-base">💎</span>
               <span>Seus diamantes: {userDiamonds}</span>
             </div>
             <motion.button
@@ -706,10 +631,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
             >
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Diamond className="w-8 h-8 text-white" />
+                  <span className="text-3xl">💎</span>
                 </div>
                 <h3 className="text-xl font-bold text-gray-800 mb-2">Enviar Diamantes</h3>
                 <p className="text-gray-600">Para {otherProfile?.name}</p>
+              </div>
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quantidade de diamantes
@@ -733,7 +659,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
                     />
                     <div className="flex items-center justify-center space-x-1 text-yellow-500">
                       {[...Array(Math.min(5, diamondAmount))].map((_, i) => (
-                        <Diamond key={i} className="w-4 h-4" />
+                        <span key={i} className="text-base">💎</span>
                       ))}
                       {diamondAmount > 5 && <span className="text-sm">+{diamondAmount - 5}</span>}
                     </div>
@@ -749,7 +675,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
                 <p className="text-xs text-gray-500 text-center mt-2">
                   Você tem {userDiamonds} diamantes disponíveis
                 </p>
-              </div>
               </div>
               <div className="flex space-x-3">
                 <button
@@ -771,6 +696,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ matchId, onBack, o
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportedUserId={otherProfile.id}
+        reportedUserName={otherProfile.name}
+        matchId={matchId}
+      />
     </div>
   )
 }

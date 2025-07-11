@@ -6,7 +6,9 @@ import { Mail, Lock, User } from 'lucide-react'
 export const AuthForm: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
+  const [confirmEmail, setConfirmEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -16,6 +18,27 @@ export const AuthForm: React.FC = () => {
     e.preventDefault()
     setLoading(true)
     setError('')
+
+    // Validações para criação de conta
+    if (!isLogin) {
+      if (email !== confirmEmail) {
+        setError('Os emails não coincidem')
+        setLoading(false)
+        return
+      }
+      
+      if (password !== confirmPassword) {
+        setError('As senhas não coincidem')
+        setLoading(false)
+        return
+      }
+      
+      if (password.length < 6) {
+        setError('A senha deve ter pelo menos 6 caracteres')
+        setLoading(false)
+        return
+      }
+    }
 
     try {
       const { error } = isLogin 
@@ -73,6 +96,20 @@ export const AuthForm: React.FC = () => {
             />
           </div>
 
+          {!isLogin && (
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="email"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                placeholder="Confirme seu email"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                required={!isLogin}
+              />
+            </div>
+          )}
+
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -84,6 +121,33 @@ export const AuthForm: React.FC = () => {
               required
             />
           </div>
+
+          {!isLogin && (
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirme sua senha"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                required={!isLogin}
+                minLength={6}
+              />
+            </div>
+          )}
+
+          {!isLogin && (
+            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              <p className="font-medium mb-1">Requisitos da senha:</p>
+              <ul className="text-xs space-y-1">
+                <li className={`flex items-center space-x-2 ${password.length >= 6 ? 'text-green-600' : 'text-gray-500'}`}>
+                  <span>{password.length >= 6 ? '✓' : '○'}</span>
+                  <span>Pelo menos 6 caracteres</span>
+                </li>
+              </ul>
+            </div>
+          )}
 
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -99,6 +163,15 @@ export const AuthForm: React.FC = () => {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
+            onClick={() => {
+              setIsLogin(!isLogin)
+              // Limpar campos ao trocar entre login e registro
+              setEmail('')
+              setConfirmEmail('')
+              setPassword('')
+              setConfirmPassword('')
+              setError('')
+            }}
             className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
           >
             {isLogin ? 'Não tem conta? Criar uma' : 'Já tem conta? Entrar'}

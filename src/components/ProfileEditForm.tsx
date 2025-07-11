@@ -77,6 +77,15 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
     }
   }
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Permitir apenas letras (maiúsculas e minúsculas), espaços e acentos
+    const filteredValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '')
+    // Limitar a 30 caracteres (suficiente para nome e sobrenome)
+    const limitedValue = filteredValue.slice(0, 30)
+    setProfile({...profile, name: limitedValue})
+  }
+
   useEffect(() => {
     loadInitialData()
   }, [])
@@ -400,11 +409,15 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
                   <input
                     type="text"
                     value={profile.name}
-                    onChange={(e) => setProfile({...profile, name: e.target.value})}
+                    onChange={handleNameChange}
                     placeholder="Seu nome"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    maxLength={30}
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    {profile.name.length}/30 caracteres
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -417,7 +430,7 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
                       placeholder="Idade"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
-                      min="13"
+                      min="18"
                       max="99"
                     />
                   </div>
@@ -472,7 +485,7 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
                   <button
                     type="button"
                     onClick={nextStep}
-                    disabled={!profile.name || !profile.age || !profile.city || !selectedStateAbbr || parseInt(profile.age) < 13 || parseInt(profile.age) > 99}
+                    disabled={!profile.name || !profile.age || !profile.city || !selectedStateAbbr || parseInt(profile.age) < 18 || parseInt(profile.age) > 99}
                     className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50"
                   >
                     Próximo
@@ -627,7 +640,7 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
                       <img
                         src={getLineImageUrl(line)}
                         alt={line}
-                        className="w-16 h-16 mx-auto mb-2 rounded-lg"
+                        className="w-16 h-16 mx-auto rounded-xl shadow-lg mb-2 bg-transparent"
                       />
                       <p className="text-sm font-medium text-gray-800 capitalize">{line}</p>
                     </motion.button>

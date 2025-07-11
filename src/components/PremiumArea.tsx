@@ -134,7 +134,7 @@ export const PremiumArea: React.FC = () => {
           >
             <div className="text-center mb-6">
               <div className="flex items-center justify-center space-x-2 mb-4">
-                <Diamond className="w-8 h-8 text-purple-600" />
+                <span className="text-3xl">💎</span>
                 <span className="text-3xl font-bold text-gray-800">R$ 25</span>
                 <span className="text-gray-500">/mês</span>
               </div>
@@ -248,7 +248,7 @@ export const PremiumArea: React.FC = () => {
             />
             <h3 className="text-white font-semibold mb-2">Converta seus Diamantes</h3>
             <p className="text-blue-200 text-sm">
-              Transforme seus diamantes do app em diamantes dentro do Mobile Legends!
+              Transforme seus 💎 do app em diamantes dentro do Mobile Legends!
             </p>
           </motion.div>
         </div>
@@ -290,7 +290,7 @@ export const PremiumArea: React.FC = () => {
               <p className="text-blue-100 text-sm">Use para super likes e boosts</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Diamond className="w-8 h-8 text-yellow-300" />
+              <span className="text-3xl">💎</span>
               <span className="text-3xl font-bold">{userDiamonds}</span>
             </div>
           </div>
@@ -377,7 +377,7 @@ export const PremiumArea: React.FC = () => {
           className="bg-white rounded-2xl shadow-xl p-6"
         >
           <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-            <Diamond className="w-6 h-6 text-purple-600 mr-2" />
+            <span className="text-2xl mr-2">💎</span>
             Comprar Diamantes
           </h3>
           
@@ -394,11 +394,17 @@ export const PremiumArea: React.FC = () => {
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                     pkg.color === 'gold' ? 'bg-yellow-100' :
                     pkg.color === 'silver' ? 'bg-gray-100' :
+                    pkg.color === 'blue' ? 'bg-blue-100' :
+                    pkg.color === 'green' ? 'bg-green-100' :
+                    pkg.color === 'orange' ? 'bg-orange-100' :
                     'bg-purple-100'
                   }`}>
                     <Diamond className={`w-6 h-6 ${
                       pkg.color === 'gold' ? 'text-yellow-600' :
                       pkg.color === 'silver' ? 'text-gray-600' :
+                      pkg.color === 'blue' ? 'text-blue-600' :
+                      pkg.color === 'green' ? 'text-green-600' :
+                      pkg.color === 'orange' ? 'text-orange-600' :
                       'text-purple-600'
                     }`} />
                   </div>
@@ -422,7 +428,7 @@ export const PremiumArea: React.FC = () => {
           
           {diamondPackages.length === 0 && (
             <div className="text-center py-8">
-              <Diamond className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <span className="text-5xl block mb-3">💎</span>
               <p className="text-gray-500">Nenhum pacote disponível no momento</p>
             </div>
           )}

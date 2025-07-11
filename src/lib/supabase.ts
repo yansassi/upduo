@@ -167,6 +167,76 @@ export type Database = {
           created_at?: string
         }
       }
+      transactions: {
+        Row: {
+          id: string
+          sender_id: string
+          receiver_id: string
+          amount: number
+          transaction_type: string
+          status: string
+          created_at: string
+          updated_at: string
+          related_message_id: string | null
+          error_message: string | null
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          receiver_id: string
+          amount: number
+          transaction_type?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          related_message_id?: string | null
+          error_message?: string | null
+        }
+        Update: {
+          id?: string
+          sender_id?: string
+          receiver_id?: string
+          amount?: number
+          transaction_type?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+          related_message_id?: string | null
+          error_message?: string | null
+        }
+      }
+      reports: {
+        Row: {
+          id: string
+          reporter_id: string
+          reported_id: string
+          match_id: string
+          reason: string
+          comment: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reporter_id: string
+          reported_id: string
+          match_id: string
+          reason: string
+          comment?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reporter_id?: string
+          reported_id?: string
+          match_id?: string
+          reason?: string
+          comment?: string | null
+          status?: string
+          created_at?: string
+        }
+      }
     }
   }
 }

@@ -127,7 +127,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
               <img
                 src={getLineImageUrl(line)}
                 alt={line}
-                className="w-12 h-12 mx-auto rounded-lg shadow-md mb-2"
+                className="w-12 h-12 mx-auto rounded-lg shadow-md mb-2 bg-transparent"
               />
               <p className="text-xs font-medium text-gray-700 capitalize">{line}</p>
             </div>

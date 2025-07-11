@@ -361,7 +361,7 @@ export const SwipeInterface: React.FC = () => {
               
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                 <p className="text-xs text-gray-600">
-                  ✨ Premium inclui: 100 swipes por dia, badge verificado e prioridade nos matches!
+                  💎 Premium inclui: 100 swipes por dia, badge verificado e prioridade nos matches!
                 </p>
               </div>
             </motion.div>

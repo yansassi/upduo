@@ -13,6 +13,7 @@ interface Profile {
   favorite_lines: string[]
   bio: string
   avatar_url?: string | null
+  is_premium?: boolean
 }
 
 interface SwipeCardProps {
@@ -65,11 +66,11 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
             {profile.is_premium && (
               <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
             )}
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-4 h-4" />
-              <span className="text-sm">{profile.age} anos</span>
+            <div className="flex items-center mb-2">
+              <h2 className="text-3xl font-bold">{profile.name}</h2>
+              {profile.is_premium && (
+                <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <MapPin className="w-4 h-4" />

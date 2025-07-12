@@ -29,6 +29,17 @@ export const PremiumArea: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [showContactModal, setShowContactModal] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
+  const [originalFilters, setOriginalFilters] = useState<FilterCriteria>({
+    minAge: 18,
+    maxAge: 35,
+    selectedRanks: [],
+    selectedCities: [],
+    selectedStates: [],
+    selectedLines: [],
+    selectedHeroes: [],
+    compatibilityMode: true
+  })
+  const [isSavingFilters, setIsSavingFilters] = useState(false)
   const [filters, setFilters] = useState<FilterCriteria>({
     minAge: 18,
     maxAge: 35,
@@ -89,6 +100,7 @@ export const PremiumArea: React.FC = () => {
         
         console.log('PremiumArea: Processed filters from database:', savedFilters)
         setFilters(savedFilters)
+        setOriginalFilters(savedFilters)
       }
       
       console.log('PremiumArea: User diamond count updated:', profileData.diamond_count)
@@ -167,6 +179,7 @@ export const PremiumArea: React.FC = () => {
   const handleApplyFilters = async () => {
     if (!user) return
 
+    setIsSavingFilters(true)
     try {
       console.log('PremiumArea: Saving filters to database', filters)
       
@@ -197,14 +210,39 @@ export const PremiumArea: React.FC = () => {
       // Refresh user data to confirm save
       await fetchUserData()
       
-      // Show success message
-      alert('Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.')
+      // Update original filters to match current state
+      setOriginalFilters(filters)
       
+      // Show success message
+      const successMessage = 'Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.'
+      
+      // Close modal after successful save
       setShowFilterModal(false)
+      
+      // Show success notification
+      alert(successMessage)
     } catch (error) {
       console.error('PremiumArea: Error in handleApplyFilters', error)
       alert('Erro ao salvar filtros. Tente novamente.')
+    } finally {
+      setIsSavingFilters(false)
     }
+  }
+
+  const hasUnsavedChanges = () => {
+    return JSON.stringify(filters) !== JSON.stringify(originalFilters)
+  }
+
+  const handleFiltersChange = (newFilters: FilterCriteria) => {
+    setFilters(newFilters)
+  }
+
+  const handleCloseFilterModal = () => {
+    // Reset filters to original state if there are unsaved changes
+    if (hasUnsavedChanges()) {
+      setFilters(originalFilters)
+    }
+    setShowFilterModal(false)
   }
 
   const getActiveFiltersCount = () => {
@@ -526,7 +564,10 @@ export const PremiumArea: React.FC = () => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setShowFilterModal(true)}
+              onClick={() => {
+                setOriginalFilters(filters) // Store current state as baseline
+                setShowFilterModal(true)
+              }}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center space-x-2"
             >
               <Settings className="w-4 h-4" />
@@ -638,10 +679,12 @@ export const PremiumArea: React.FC = () => {
       {/* Filter Modal */}
       <FilterModal
         isOpen={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
+        onClose={handleCloseFilterModal}
         filters={filters}
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
         onApplyFilters={handleApplyFilters}
+        hasUnsavedChanges={hasUnsavedChanges()}
+        isSaving={isSavingFilters}
         isPremium={true}
         ranks={filterData.ranks}
         locations={filterData.locations}

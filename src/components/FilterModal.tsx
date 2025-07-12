@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Filter, RotateCcw, Crown } from 'lucide-react';
+import { X, Filter, RotateCcw, Crown, Save, AlertCircle } from 'lucide-react';
 
 export interface FilterCriteria {
   minAge: number;
@@ -18,6 +18,8 @@ interface FilterModalProps {
   filters: FilterCriteria;
   onFiltersChange: (filters: FilterCriteria) => void;
   onApplyFilters: () => void;
+  hasUnsavedChanges?: boolean;
+  isSaving?: boolean;
   isPremium: boolean;
   ranks: Array<{ id: string; name: string; color?: string }>;
   locations: Array<{ id: string; name: string; state_abbr: string; region: string }>;
@@ -31,6 +33,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   filters,
   onFiltersChange,
   onApplyFilters,
+  hasUnsavedChanges = false,
+  isSaving = false,
   isPremium,
   ranks,
   locations,
@@ -38,6 +42,16 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   heroes
 }) => {
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      const confirmClose = window.confirm(
+        'Você tem alterações não salvas. Deseja realmente fechar sem salvar?'
+      );
+      if (!confirmClose) return;
+    }
+    onClose();
+  };
 
   const updateFilters = (updates: Partial<FilterCriteria>) => {
     onFiltersChange({ ...filters, ...updates });
@@ -101,9 +115,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 {getActiveFiltersCount()} ativo{getActiveFiltersCount() > 1 ? 's' : ''}
               </span>
             )}
+            {hasUnsavedChanges && (
+              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Não salvo
+              </span>
+            )}
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -314,6 +334,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         <div className="flex items-center justify-between p-6 border-t bg-gray-50">
           <button
             onClick={resetFilters}
+            disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
@@ -321,7 +342,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           </button>
           <div className="flex gap-3">
             <button
-              onClick={onClose}
+              onClick={handleClose}
+              disabled={isSaving}
               className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
             >
               Cancelar
@@ -329,14 +351,36 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             <button
               onClick={() => {
                 onApplyFilters();
-                onClose();
               }}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={isSaving}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              Aplicar Filtros
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Aplicar Filtros
+                </>
+              )}
             </button>
           </div>
         </div>
+        
+        {/* Unsaved Changes Warning */}
+        {hasUnsavedChanges && (
+          <div className="bg-orange-50 border-t border-orange-200 p-4">
+            <div className="flex items-center gap-2 text-orange-800">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Você tem alterações não salvas. Clique em "Aplicar Filtros" para salvar suas preferências.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

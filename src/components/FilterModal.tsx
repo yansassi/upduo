@@ -59,11 +59,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   const getActiveFiltersCount = () => {
     let count = 0;
     if (filters.minAge !== 18 || filters.maxAge !== 35) count++;
-    if (filters.selectedRanks.length > 0) count++;
-    if (filters.selectedStates.length > 0) count++;
-    if (filters.selectedCities.length > 0) count++;
-    if (filters.selectedLanes.length > 0) count++;
-    if (filters.selectedHeroes.length > 0) count++;
+    if (filters.selectedRanks?.length > 0) count++;
+    if (filters.selectedStates?.length > 0) count++;
+    if (filters.selectedCities?.length > 0) count++;
+    if (filters.selectedLanes?.length > 0) count++;
+    if (filters.selectedHeroes?.length > 0) count++;
     if (filters.compatibilityMode) count++;
     return count;
   };

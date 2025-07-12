@@ -283,17 +283,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <div className="flex flex-col items-center justify-center mb-3">
-                  <div className="flex items-center mb-2">
+                <div className="flex items-center justify-center mb-3">
                   <h1 className="text-4xl font-bold drop-shadow-lg">{profile.name}</h1>
                   {profile.is_premium && (
                     <BadgeCheck className="w-8 h-8 text-blue-400 ml-2 drop-shadow-lg" />
-                  )}
-                </div>
-                  {profile.is_premium && (
-                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                      ⭐ PREMIUM
-                    </div>
                   )}
                 </div>
                 <div className="flex items-center space-x-6 text-lg">
@@ -320,6 +313,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
             <div className="flex items-center space-x-3 mb-4">
               <Trophy className="w-6 h-6 text-yellow-600" />
               <h3 className="text-xl font-bold text-gray-800">Elo Atual</h3>
+              {profile.is_premium && (
+                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg ml-auto">
+                  ⭐ PREMIUM
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <img

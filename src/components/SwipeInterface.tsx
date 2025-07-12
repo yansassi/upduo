@@ -3,10 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { SwipeCard } from './SwipeCard'
-import { FilterModal, FilterCriteria } from './FilterModal'
-import { HEROES, RANKS, LINES } from '../constants/gameData'
-import { fetchAllLocations, City } from '../utils/locationUtils'
-import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw, Filter, Zap } from 'lucide-react'
+import { FilterCriteria } from './FilterModal'
+import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw, Zap, Settings } from 'lucide-react'
 import { useSwipeLimits, incrementSwipeCount, decrementSwipeCount } from '../hooks/useSwipeLimits'
 
 interface Profile {
@@ -35,7 +33,6 @@ export const SwipeInterface: React.FC = () => {
   const [matchFound, setMatchFound] = useState<Profile | null>(null)
   const [lastSwipeInfo, setLastSwipeInfo] = useState<LastSwipeInfo | null>(null)
   const [rewindLoading, setRewindLoading] = useState(false)
-  const [showFilterModal, setShowFilterModal] = useState(false)
   const [filters, setFilters] = useState<FilterCriteria>({
     minAge: 18,
     maxAge: 35,
@@ -44,69 +41,24 @@ export const SwipeInterface: React.FC = () => {
     selectedStates: [],
     selectedLines: [],
     selectedHeroes: [],
-    maxDistance: 100,
     compatibilityMode: true
   })
   const [filtersApplied, setFiltersApplied] = useState(false)
   const swipeLimits = useSwipeLimits()
-  
-  // Data for filters
-  const [filterData, setFilterData] = useState({
-    ranks: [] as Array<{id: string, name: string, color?: string}>,
-    locations: [] as City[],
-    lanes: [] as Array<{id: string, name: string, color?: string}>,
-    heroes: [] as Array<{id: string, name: string, image_url?: string}>
-  })
 
   useEffect(() => {
+    loadFiltersFromStorage()
     fetchProfiles()
   }, [user])
   
-  // Load filter data on component mount
   useEffect(() => {
-    const loadFilterData = async () => {
-      try {
-        // Fetch locations from database
-        const locations = await fetchAllLocations()
-        
-        // Transform constants to expected format
-        const ranks = RANKS.map(rank => ({
-          id: rank.id,
-          name: rank.name,
-          color: rank.color
-        }))
-        
-        const lanes = LINES.map(line => ({
-          id: line.id,
-          name: line.name,
-          color: line.color
-        }))
-        
-        const heroes = HEROES.filter(hero => !hero.is_category).map(hero => ({
-          id: hero.id,
-          name: hero.name,
-          image_url: hero.image_url
-        }))
-        
-        setFilterData({
-          ranks,
-          locations,
-          lanes,
-          heroes
-        })
-        
-        console.log('SwipeInterface: Filter data loaded', {
-          ranksCount: ranks.length,
-          locationsCount: locations.length,
-          lanesCount: lanes.length,
-          heroesCount: heroes.length
-        })
-      } catch (error) {
-        console.error('SwipeInterface: Error loading filter data:', error)
-      }
+    // Check if filters were applied from Premium area
+    const filtersAppliedFromStorage = localStorage.getItem('filtersApplied')
+    if (filtersAppliedFromStorage === 'true') {
+      console.log('SwipeInterface: Filters were applied from Premium area, refetching profiles')
+      fetchProfiles()
+      localStorage.removeItem('filtersApplied') // Clear the flag
     }
-    
-    loadFilterData()
   }, [])
 
   // Pré-carregar mais perfis quando estiver próximo do fim
@@ -120,6 +72,20 @@ export const SwipeInterface: React.FC = () => {
       fetchMoreProfiles()
     }
   }, [currentIndex, profiles.length, loading])
+
+  const loadFiltersFromStorage = () => {
+    try {
+      const savedFilters = localStorage.getItem('premiumFilters')
+      if (savedFilters) {
+        const parsedFilters = JSON.parse(savedFilters)
+        setFilters(parsedFilters)
+        setFiltersApplied(true)
+        console.log('SwipeInterface: Loaded filters from storage', parsedFilters)
+      }
+    } catch (error) {
+      console.error('SwipeInterface: Error loading filters from storage', error)
+    }
+  }
 
   const fetchProfiles = async () => {
     if (!user) return
@@ -377,29 +343,6 @@ export const SwipeInterface: React.FC = () => {
     return Math.max(0.2, 1 - (difference * 0.2))
   }
 
-  const handleApplyFilters = () => {
-    console.log('SwipeInterface: Applying filters and refetching profiles')
-    setFiltersApplied(true)
-    fetchProfiles()
-  }
-
-  const handleResetFilters = () => {
-    console.log('SwipeInterface: Resetting filters')
-    setFilters({
-      minAge: 18,
-      maxAge: 35,
-      selectedRanks: [],
-      selectedCities: [],
-      selectedStates: [],
-      selectedLines: [],
-      selectedHeroes: [],
-      maxDistance: 100,
-      compatibilityMode: true
-    })
-    setFiltersApplied(false)
-    fetchProfiles()
-  }
-
   const getActiveFiltersCount = () => {
     let count = 0
     if (filters.minAge !== 18 || filters.maxAge !== 35) count++
@@ -411,6 +354,7 @@ export const SwipeInterface: React.FC = () => {
     if (!filters.compatibilityMode) count++
     return count
   }
+
   const handleSwipe = async (direction: 'left' | 'right') => {
     if (!user || currentIndex >= profiles.length || !swipeLimits.canSwipe) {
       console.log('SwipeInterface: Cannot swipe', {
@@ -740,28 +684,22 @@ export const SwipeInterface: React.FC = () => {
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
           
-          {/* Filter Status */}
+          {/* Filter Status - Only show if filters are applied */}
           {swipeLimits.isPremium && (
             <div className="mt-4 flex items-center justify-center space-x-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowFilterModal(true)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                  getActiveFiltersCount() > 0
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                <span className="text-sm">
-                  {getActiveFiltersCount() > 0 
-                    ? `${getActiveFiltersCount()} filtros ativos` 
-                    : 'Filtros Avançados'
-                  }
-                </span>
-                <Crown className="w-4 h-4 text-yellow-300" />
-              </motion.button>
+              {getActiveFiltersCount() > 0 ? (
+                <div className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-full">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-sm">{getActiveFiltersCount()} filtros ativos</span>
+                  <Crown className="w-4 h-4 text-yellow-300" />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 bg-white bg-opacity-20 text-white px-4 py-2 rounded-full">
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm">Configure filtros na aba Premium</span>
+                  <Crown className="w-4 h-4 text-yellow-300" />
+                </div>
+              )}
               
               {filters.compatibilityMode && (
                 <div className="flex items-center space-x-1 bg-green-500 bg-opacity-20 text-green-200 px-3 py-1 rounded-full">
@@ -963,19 +901,6 @@ export const SwipeInterface: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Filter Modal */}
-      <FilterModal
-        isOpen={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        filters={filters}
-        onFiltersChange={setFilters}
-        onApplyFilters={handleApplyFilters}
-        isPremium={swipeLimits.isPremium}
-        ranks={filterData.ranks}
-        locations={filterData.locations}
-        lanes={filterData.lanes}
-        heroes={filterData.heroes}
-      />
     </div>
   )
 }

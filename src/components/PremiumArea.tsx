@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Diamond, Crown, Star, Zap, Heart, Users, MessageCircle, Check, Sparkles, Rocket, Code, TrendingUp, Shield, X, MessageSquare } from 'lucide-react'
+import { Diamond, Crown, Star, Zap, Heart, Users, MessageCircle, Check, Sparkles, Rocket, Code, TrendingUp, Shield, X, MessageSquare, Filter, Settings } from 'lucide-react'
+import { FilterModal, FilterCriteria } from './FilterModal'
+import { HEROES, RANKS, LINES } from '../constants/gameData'
+import { fetchAllLocations, City } from '../utils/locationUtils'
 
 interface Profile {
   id: string
@@ -25,11 +28,31 @@ export const PremiumArea: React.FC = () => {
   const [userDiamonds, setUserDiamonds] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showContactModal, setShowContactModal] = useState(false)
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [filters, setFilters] = useState<FilterCriteria>({
+    minAge: 18,
+    maxAge: 35,
+    selectedRanks: [],
+    selectedCities: [],
+    selectedStates: [],
+    selectedLines: [],
+    selectedHeroes: [],
+    compatibilityMode: true
+  })
+  
+  // Data for filters
+  const [filterData, setFilterData] = useState({
+    ranks: [] as Array<{id: string, name: string, color?: string}>,
+    locations: [] as City[],
+    lanes: [] as Array<{id: string, name: string, color?: string}>,
+    heroes: [] as Array<{id: string, name: string, image_url?: string}>
+  })
 
   useEffect(() => {
     if (user) {
       fetchUserData()
       fetchDiamondPackages()
+      loadFilterData()
     }
   }, [user])
 
@@ -80,6 +103,69 @@ export const PremiumArea: React.FC = () => {
     } catch (error) {
       console.error('Error fetching diamond packages:', error)
     }
+  }
+
+  // Load filter data
+  const loadFilterData = async () => {
+    try {
+      // Fetch locations from database
+      const locations = await fetchAllLocations()
+      
+      // Transform constants to expected format
+      const ranks = RANKS.map(rank => ({
+        id: rank,
+        name: rank
+      }))
+      
+      const lanes = LINES.map(line => ({
+        id: line,
+        name: line
+      }))
+      
+      const heroes = HEROES.map(hero => ({
+        id: hero,
+        name: hero
+      }))
+      
+      setFilterData({
+        ranks,
+        locations,
+        lanes,
+        heroes
+      })
+      
+      console.log('PremiumArea: Filter data loaded', {
+        ranksCount: ranks.length,
+        locationsCount: locations.length,
+        lanesCount: lanes.length,
+        heroesCount: heroes.length
+      })
+    } catch (error) {
+      console.error('PremiumArea: Error loading filter data:', error)
+    }
+  }
+
+  const handleApplyFilters = () => {
+    // Save filters to localStorage for SwipeInterface to use
+    localStorage.setItem('premiumFilters', JSON.stringify(filters))
+    localStorage.setItem('filtersApplied', 'true')
+    
+    // Show success message
+    alert('Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.')
+    
+    setShowFilterModal(false)
+  }
+
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (filters.minAge !== 18 || filters.maxAge !== 35) count++
+    if (filters.selectedRanks.length > 0) count++
+    if (filters.selectedCities.length > 0) count++
+    if (filters.selectedStates.length > 0) count++
+    if (filters.selectedLines.length > 0) count++
+    if (filters.selectedHeroes.length > 0) count++
+    if (!filters.compatibilityMode) count++
+    return count
   }
 
   const handlePurchasePremium = () => {
@@ -340,6 +426,62 @@ export const PremiumArea: React.FC = () => {
               <p className="text-xs text-gray-600">Verificado</p>
             </div>
           </div>
+          
+          {/* Advanced Filters Section */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-blue-600" />
+                <h4 className="text-lg font-semibold text-gray-800">Filtros Avançados</h4>
+              </div>
+              {getActiveFiltersCount() > 0 && (
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                  {getActiveFiltersCount()} ativo{getActiveFiltersCount() > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            
+            <p className="text-gray-600 text-sm mb-4">
+              Configure filtros personalizados para encontrar exatamente o tipo de jogador que você procura.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Filtro por idade</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Filtro por elo</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Filtro por localização</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Filtro por heróis</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Filtro por linhas</span>
+              </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Zap className="w-3 h-3 text-yellow-500" />
+                <span>Modo compatibilidade</span>
+              </div>
+            </div>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowFilterModal(true)}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center space-x-2"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Configurar Filtros</span>
+            </motion.button>
+          </div>
         </motion.div>
 
         {/* Thank You Section for Premium Users */}
@@ -441,6 +583,20 @@ export const PremiumArea: React.FC = () => {
           )}
         </motion.div>
       </div>
+      
+      {/* Filter Modal */}
+      <FilterModal
+        isOpen={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onApplyFilters={handleApplyFilters}
+        isPremium={true}
+        ranks={filterData.ranks}
+        locations={filterData.locations}
+        lanes={filterData.lanes}
+        heroes={filterData.heroes}
+      />
 
       {/* Contact Developer Modal */}
       <AnimatePresence>

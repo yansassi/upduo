@@ -39,11 +39,10 @@ export const SwipeInterface: React.FC = () => {
     selectedRanks: [],
     selectedCities: [],
     selectedStates: [],
-    selectedLines: [],
+    selectedLanes: [],
     selectedHeroes: [],
     compatibilityMode: true
   })
-  const [filtersApplied, setFiltersApplied] = useState(false)
   const swipeLimits = useSwipeLimits()
 
   useEffect(() => {
@@ -51,15 +50,6 @@ export const SwipeInterface: React.FC = () => {
     fetchProfiles()
   }, [user])
   
-  useEffect(() => {
-    // Check if filters were applied from Premium area
-    const filtersAppliedFromStorage = localStorage.getItem('filtersApplied')
-    if (filtersAppliedFromStorage === 'true') {
-      console.log('SwipeInterface: Filters were applied from Premium area, refetching profiles')
-      fetchProfiles()
-      localStorage.removeItem('filtersApplied') // Clear the flag
-    }
-  }, [])
 
   // Pré-carregar mais perfis quando estiver próximo do fim
   useEffect(() => {
@@ -81,11 +71,7 @@ export const SwipeInterface: React.FC = () => {
       
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select(`
-          min_age_filter, max_age_filter,
-          selected_ranks_filter, selected_states_filter, selected_cities_filter,
-          selected_lanes_filter, selected_heroes_filter, compatibility_mode_filter
-        `)
+        .select('*')
         .eq('id', user.id)
         .single()
 
@@ -95,19 +81,25 @@ export const SwipeInterface: React.FC = () => {
       }
 
       if (profileData) {
+        console.log('SwipeInterface: Raw profile data from database:', profileData)
+        
         const savedFilters: FilterCriteria = {
           minAge: profileData.min_age_filter || 18,
           maxAge: profileData.max_age_filter || 35,
           selectedRanks: profileData.selected_ranks_filter || [],
           selectedStates: profileData.selected_states_filter || [],
           selectedCities: profileData.selected_cities_filter || [],
-          selectedLines: profileData.selected_lanes_filter || [],
+          selectedLanes: profileData.selected_lanes_filter || [],
           selectedHeroes: profileData.selected_heroes_filter || [],
-          compatibilityMode: profileData.compatibility_mode_filter !== false
+          compatibilityMode: profileData.compatibility_mode_filter ?? true
         }
         setFilters(savedFilters)
-        setFiltersApplied(true)
         console.log('SwipeInterface: Loaded filters from database', savedFilters)
+        
+        // Refetch profiles with new filters
+        setTimeout(() => {
+          fetchProfiles()
+        }, 100)
       }
     } catch (error) {
       console.error('SwipeInterface: Error loading filters from database', error)
@@ -208,8 +200,8 @@ export const SwipeInterface: React.FC = () => {
     }
 
     // Apply line filters
-    if (filters.selectedLines.length > 0) {
-      query = query.overlaps('favorite_lines', filters.selectedLines)
+    if (filters.selectedLanes.length > 0) {
+      query = query.overlaps('favorite_lines', filters.selectedLanes)
     }
 
     // Execute query
@@ -376,9 +368,9 @@ export const SwipeInterface: React.FC = () => {
     if (filters.selectedRanks.length > 0) count++
     if (filters.selectedCities.length > 0) count++
     if (filters.selectedStates.length > 0) count++
-    if (filters.selectedLines.length > 0) count++
+    if (filters.selectedLanes.length > 0) count++
     if (filters.selectedHeroes.length > 0) count++
-    if (!filters.compatibilityMode) count++
+    if (filters.compatibilityMode === false) count++
     return count
   }
 

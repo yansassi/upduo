@@ -52,7 +52,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       selectedCities: [],
       selectedLanes: [],
       selectedHeroes: [],
-      compatibilityMode: false
+      compatibilityMode: true
     });
   };
 
@@ -64,7 +64,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     if (filters.selectedCities?.length > 0) count++;
     if (filters.selectedLanes?.length > 0) count++;
     if (filters.selectedHeroes?.length > 0) count++;
-    if (filters.compatibilityMode) count++;
+    if (filters.compatibilityMode === false) count++;
     return count;
   };
 

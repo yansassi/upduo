@@ -62,12 +62,7 @@ export const PremiumArea: React.FC = () => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select(`
-          id, is_premium, diamond_count,
-          min_age_filter, max_age_filter,
-          selected_ranks_filter, selected_states_filter, selected_cities_filter,
-          selected_lanes_filter, selected_heroes_filter, compatibility_mode_filter
-        `)
+        .select('*')
         .eq('id', user.id)
         .single()
 
@@ -79,18 +74,21 @@ export const PremiumArea: React.FC = () => {
       
       // Carregar filtros salvos do banco de dados
       if (profileData) {
+        console.log('PremiumArea: Raw profile data from database:', profileData)
+        
         const savedFilters: FilterCriteria = {
           minAge: profileData.min_age_filter || 18,
           maxAge: profileData.max_age_filter || 35,
           selectedRanks: profileData.selected_ranks_filter || [],
           selectedStates: profileData.selected_states_filter || [],
           selectedCities: profileData.selected_cities_filter || [],
-          selectedLines: profileData.selected_lanes_filter || [],
+          selectedLanes: profileData.selected_lanes_filter || [],
           selectedHeroes: profileData.selected_heroes_filter || [],
-          compatibilityMode: profileData.compatibility_mode_filter !== false
+          compatibilityMode: profileData.compatibility_mode_filter ?? true
         }
+        
+        console.log('PremiumArea: Processed filters from database:', savedFilters)
         setFilters(savedFilters)
-        console.log('PremiumArea: Loaded filters from database', savedFilters)
       }
       
       console.log('PremiumArea: User diamond count updated:', profileData.diamond_count)
@@ -181,7 +179,7 @@ export const PremiumArea: React.FC = () => {
           selected_ranks_filter: filters.selectedRanks,
           selected_states_filter: filters.selectedStates,
           selected_cities_filter: filters.selectedCities,
-          selected_lanes_filter: filters.selectedLines,
+          selected_lanes_filter: filters.selectedLanes,
           selected_heroes_filter: filters.selectedHeroes,
           compatibility_mode_filter: filters.compatibilityMode,
           updated_at: new Date().toISOString()
@@ -196,8 +194,8 @@ export const PremiumArea: React.FC = () => {
 
       console.log('PremiumArea: Filters saved successfully')
       
-      // Set flag for SwipeInterface to refresh
-      localStorage.setItem('filtersApplied', 'true')
+      // Refresh user data to confirm save
+      await fetchUserData()
       
       // Show success message
       alert('Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.')
@@ -215,9 +213,9 @@ export const PremiumArea: React.FC = () => {
     if (filters.selectedRanks.length > 0) count++
     if (filters.selectedCities.length > 0) count++
     if (filters.selectedStates.length > 0) count++
-    if (filters.selectedLines.length > 0) count++
+    if (filters.selectedLanes.length > 0) count++
     if (filters.selectedHeroes.length > 0) count++
-    if (!filters.compatibilityMode) count++
+    if (filters.compatibilityMode === false) count++
     return count
   }
 

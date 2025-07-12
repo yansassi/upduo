@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { SwipeCard } from './SwipeCard'
 import { FilterModal, FilterCriteria } from './FilterModal'
+import { HEROES, RANKS, LINES } from '../constants/gameData'
+import { fetchAllLocations, City } from '../utils/locationUtils'
 import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw, Filter, Zap } from 'lucide-react'
 import { useSwipeLimits, incrementSwipeCount, decrementSwipeCount } from '../hooks/useSwipeLimits'
 
@@ -47,10 +49,65 @@ export const SwipeInterface: React.FC = () => {
   })
   const [filtersApplied, setFiltersApplied] = useState(false)
   const swipeLimits = useSwipeLimits()
+  
+  // Data for filters
+  const [filterData, setFilterData] = useState({
+    ranks: [] as Array<{id: string, name: string, color?: string}>,
+    locations: [] as City[],
+    lanes: [] as Array<{id: string, name: string, color?: string}>,
+    heroes: [] as Array<{id: string, name: string, image_url?: string}>
+  })
 
   useEffect(() => {
     fetchProfiles()
   }, [user])
+  
+  // Load filter data on component mount
+  useEffect(() => {
+    const loadFilterData = async () => {
+      try {
+        // Fetch locations from database
+        const locations = await fetchAllLocations()
+        
+        // Transform constants to expected format
+        const ranks = RANKS.map(rank => ({
+          id: rank.id,
+          name: rank.name,
+          color: rank.color
+        }))
+        
+        const lanes = LINES.map(line => ({
+          id: line.id,
+          name: line.name,
+          color: line.color
+        }))
+        
+        const heroes = HEROES.filter(hero => !hero.is_category).map(hero => ({
+          id: hero.id,
+          name: hero.name,
+          image_url: hero.image_url
+        }))
+        
+        setFilterData({
+          ranks,
+          locations,
+          lanes,
+          heroes
+        })
+        
+        console.log('SwipeInterface: Filter data loaded', {
+          ranksCount: ranks.length,
+          locationsCount: locations.length,
+          lanesCount: lanes.length,
+          heroesCount: heroes.length
+        })
+      } catch (error) {
+        console.error('SwipeInterface: Error loading filter data:', error)
+      }
+    }
+    
+    loadFilterData()
+  }, [])
 
   // Pré-carregar mais perfis quando estiver próximo do fim
   useEffect(() => {
@@ -914,6 +971,10 @@ export const SwipeInterface: React.FC = () => {
         onFiltersChange={setFilters}
         onApplyFilters={handleApplyFilters}
         isPremium={swipeLimits.isPremium}
+        ranks={filterData.ranks}
+        locations={filterData.locations}
+        lanes={filterData.lanes}
+        heroes={filterData.heroes}
       />
     </div>
   )

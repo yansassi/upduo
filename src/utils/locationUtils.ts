@@ -152,3 +152,28 @@ export const getCityByName = async (cityName: string): Promise<City | null> => {
     return null
   }
 }
+
+/**
+ * Busca todas as localizações disponíveis no banco de dados
+ */
+export const fetchAllLocations = async (): Promise<City[]> => {
+  console.log('LocationUtils: fetchAllLocations called')
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .order('name')
+
+    console.log('LocationUtils: fetchAllLocations query result', { data, error })
+
+    if (error) throw error
+
+    const locationsCount = data?.length || 0
+    console.log('LocationUtils: total locations found:', locationsCount)
+    
+    return data || []
+  } catch (error) {
+    console.error('LocationUtils: Error fetching all locations:', error)
+    return []
+  }
+}

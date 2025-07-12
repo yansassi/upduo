@@ -62,7 +62,12 @@ export const PremiumArea: React.FC = () => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('id, is_premium, diamond_count')
+        .select(`
+          id, is_premium, diamond_count,
+          min_age_filter, max_age_filter,
+          selected_ranks_filter, selected_states_filter, selected_cities_filter,
+          selected_lanes_filter, selected_heroes_filter, compatibility_mode_filter
+        `)
         .eq('id', user.id)
         .single()
 
@@ -71,6 +76,22 @@ export const PremiumArea: React.FC = () => {
 
       // Atualizar contador de diamantes em tempo real
       setUserDiamonds(profileData.diamond_count || 0)
+      
+      // Carregar filtros salvos do banco de dados
+      if (profileData) {
+        const savedFilters: FilterCriteria = {
+          minAge: profileData.min_age_filter || 18,
+          maxAge: profileData.max_age_filter || 35,
+          selectedRanks: profileData.selected_ranks_filter || [],
+          selectedStates: profileData.selected_states_filter || [],
+          selectedCities: profileData.selected_cities_filter || [],
+          selectedLines: profileData.selected_lanes_filter || [],
+          selectedHeroes: profileData.selected_heroes_filter || [],
+          compatibilityMode: profileData.compatibility_mode_filter !== false
+        }
+        setFilters(savedFilters)
+        console.log('PremiumArea: Loaded filters from database', savedFilters)
+      }
       
       console.log('PremiumArea: User diamond count updated:', profileData.diamond_count)
     } catch (error) {
@@ -145,15 +166,47 @@ export const PremiumArea: React.FC = () => {
     }
   }
 
-  const handleApplyFilters = () => {
-    // Save filters to localStorage for SwipeInterface to use
-    localStorage.setItem('premiumFilters', JSON.stringify(filters))
-    localStorage.setItem('filtersApplied', 'true')
-    
-    // Show success message
-    alert('Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.')
-    
-    setShowFilterModal(false)
+  const handleApplyFilters = async () => {
+    if (!user) return
+
+    try {
+      console.log('PremiumArea: Saving filters to database', filters)
+      
+      // Save filters to database
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          min_age_filter: filters.minAge,
+          max_age_filter: filters.maxAge,
+          selected_ranks_filter: filters.selectedRanks,
+          selected_states_filter: filters.selectedStates,
+          selected_cities_filter: filters.selectedCities,
+          selected_lanes_filter: filters.selectedLines,
+          selected_heroes_filter: filters.selectedHeroes,
+          compatibility_mode_filter: filters.compatibilityMode,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (error) {
+        console.error('PremiumArea: Error saving filters', error)
+        alert('Erro ao salvar filtros. Tente novamente.')
+        return
+      }
+
+      console.log('PremiumArea: Filters saved successfully')
+      
+      // Set flag for SwipeInterface to refresh
+      localStorage.setItem('filtersApplied', 'true')
+      
+      // Show success message
+      alert('Filtros aplicados com sucesso! Volte para a aba Descobrir para ver os resultados.')
+      
+      setShowFilterModal(false)
+    } catch (error) {
+      console.error('PremiumArea: Error in handleApplyFilters', error)
+      alert('Erro ao salvar filtros. Tente novamente.')
+    }
   }
 
   const getActiveFiltersCount = () => {

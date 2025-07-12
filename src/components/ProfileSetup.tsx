@@ -228,7 +228,15 @@ export const ProfileSetup: React.FC = () => {
           bio: profile.bio,
           avatar_url,
           is_premium: false,
-          diamond_count: 0
+          diamond_count: 0,
+          min_age_filter: 18,
+          max_age_filter: 35,
+          selected_ranks_filter: [],
+          selected_states_filter: [],
+          selected_cities_filter: [],
+          selected_lanes_filter: [],
+          selected_heroes_filter: [],
+          compatibility_mode_filter: true
         }, {
           onConflict: 'id'
         })

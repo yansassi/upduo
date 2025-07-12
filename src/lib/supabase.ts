@@ -56,6 +56,14 @@ export type Database = {
           diamond_count: number
           created_at: string
           updated_at: string
+          min_age_filter: number
+          max_age_filter: number
+          selected_ranks_filter: string[]
+          selected_states_filter: string[]
+          selected_cities_filter: string[]
+          selected_lanes_filter: string[]
+          selected_heroes_filter: string[]
+          compatibility_mode_filter: boolean
         }
         Insert: {
           id: string
@@ -72,6 +80,14 @@ export type Database = {
           diamond_count?: number
           created_at?: string
           updated_at?: string
+          min_age_filter?: number
+          max_age_filter?: number
+          selected_ranks_filter?: string[]
+          selected_states_filter?: string[]
+          selected_cities_filter?: string[]
+          selected_lanes_filter?: string[]
+          selected_heroes_filter?: string[]
+          compatibility_mode_filter?: boolean
         }
         Update: {
           id?: string
@@ -87,6 +103,14 @@ export type Database = {
           is_premium?: boolean
           diamond_count?: number
           updated_at?: string
+          min_age_filter?: number
+          max_age_filter?: number
+          selected_ranks_filter?: string[]
+          selected_states_filter?: string[]
+          selected_cities_filter?: string[]
+          selected_lanes_filter?: string[]
+          selected_heroes_filter?: string[]
+          compatibility_mode_filter?: boolean
         }
       }
       swipes: {

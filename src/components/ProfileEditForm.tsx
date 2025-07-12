@@ -287,7 +287,16 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
           favorite_lines: profile.favorite_lines,
           bio: profile.bio,
           avatar_url,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          // Ensure filter columns exist with defaults if not set
+          min_age_filter: 18,
+          max_age_filter: 35,
+          selected_ranks_filter: [],
+          selected_states_filter: [],
+          selected_cities_filter: [],
+          selected_lanes_filter: [],
+          selected_heroes_filter: [],
+          compatibility_mode_filter: true
         })
         .eq('id', user.id)
         .select()

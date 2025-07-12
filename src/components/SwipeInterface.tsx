@@ -47,7 +47,7 @@ export const SwipeInterface: React.FC = () => {
   const swipeLimits = useSwipeLimits()
 
   useEffect(() => {
-    loadFiltersFromStorage()
+    loadFiltersFromDatabase()
     fetchProfiles()
   }, [user])
   
@@ -73,17 +73,44 @@ export const SwipeInterface: React.FC = () => {
     }
   }, [currentIndex, profiles.length, loading])
 
-  const loadFiltersFromStorage = () => {
+  const loadFiltersFromDatabase = async () => {
+    if (!user) return
+    
     try {
-      const savedFilters = localStorage.getItem('premiumFilters')
-      if (savedFilters) {
-        const parsedFilters = JSON.parse(savedFilters)
-        setFilters(parsedFilters)
+      console.log('SwipeInterface: Loading filters from database for user', user.id)
+      
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select(`
+          min_age_filter, max_age_filter,
+          selected_ranks_filter, selected_states_filter, selected_cities_filter,
+          selected_lanes_filter, selected_heroes_filter, compatibility_mode_filter
+        `)
+        .eq('id', user.id)
+        .single()
+
+      if (error) {
+        console.error('SwipeInterface: Error loading filters from database', error)
+        return
+      }
+
+      if (profileData) {
+        const savedFilters: FilterCriteria = {
+          minAge: profileData.min_age_filter || 18,
+          maxAge: profileData.max_age_filter || 35,
+          selectedRanks: profileData.selected_ranks_filter || [],
+          selectedStates: profileData.selected_states_filter || [],
+          selectedCities: profileData.selected_cities_filter || [],
+          selectedLines: profileData.selected_lanes_filter || [],
+          selectedHeroes: profileData.selected_heroes_filter || [],
+          compatibilityMode: profileData.compatibility_mode_filter !== false
+        }
+        setFilters(savedFilters)
         setFiltersApplied(true)
-        console.log('SwipeInterface: Loaded filters from storage', parsedFilters)
+        console.log('SwipeInterface: Loaded filters from database', savedFilters)
       }
     } catch (error) {
-      console.error('SwipeInterface: Error loading filters from storage', error)
+      console.error('SwipeInterface: Error loading filters from database', error)
     }
   }
 

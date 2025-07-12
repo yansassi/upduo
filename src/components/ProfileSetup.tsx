@@ -18,6 +18,8 @@ export const ProfileSetup: React.FC = () => {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [heroSearch, setHeroSearch] = useState('')
   const [lineSearch, setLineSearch] = useState('')
+  const [citySearch, setCitySearch] = useState('')
+  const [showCityDropdown, setShowCityDropdown] = useState(false)
   const [profile, setProfile] = useState({
     name: '',
     age: '',
@@ -38,6 +40,11 @@ export const ProfileSetup: React.FC = () => {
   const filteredLines = LINES.filter(line =>
     line.toLowerCase().includes(lineSearch.toLowerCase())
   )
+
+  // Filter cities based on search
+  const filteredCities = cities.filter(city =>
+    city.name.toLowerCase().includes(citySearch.toLowerCase())
+  ).slice(0, 50) // Limit to 50 results for performance
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -76,6 +83,15 @@ export const ProfileSetup: React.FC = () => {
 
   useEffect(() => {
     loadStates()
+    // Fechar dropdown quando clicar fora
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.relative')) {
+        setShowCityDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   useEffect(() => {
@@ -84,6 +100,8 @@ export const ProfileSetup: React.FC = () => {
     } else {
       setCities([])
       setProfile(prev => ({ ...prev, city: '' }))
+      setCitySearch('')
+      setShowCityDropdown(false)
     }
   }, [selectedStateAbbr])
 
@@ -93,9 +111,21 @@ export const ProfileSetup: React.FC = () => {
   }
 
   const loadCitiesByState = async (stateAbbr: string) => {
+    console.log('ProfileSetup: Loading cities for state:', stateAbbr)
     setLoadingCities(true)
-    const citiesData = await fetchCitiesByState(stateAbbr)
-    setCities(citiesData)
+    try {
+      const citiesData = await fetchCitiesByState(stateAbbr)
+      console.log('ProfileSetup: Cities loaded:', citiesData.length, 'cities for state', stateAbbr)
+      setCities(citiesData)
+      
+      // Log algumas cidades para debug
+      if (citiesData.length > 0) {
+        console.log('ProfileSetup: First 10 cities:', citiesData.slice(0, 10).map(c => c.name))
+      }
+    } catch (error) {
+      console.error('ProfileSetup: Error loading cities:', error)
+      setCities([])
+    }
     setLoadingCities(false)
   }
 
@@ -111,6 +141,15 @@ export const ProfileSetup: React.FC = () => {
 
   const handleCityChange = (cityName: string) => {
     setProfile(prev => ({ ...prev, city: cityName }))
+    setCitySearch(cityName)
+    setShowCityDropdown(false)
+  }
+
+  const handleCitySearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setCitySearch(value)
+    setProfile(prev => ({ ...prev, city: value }))
+    setShowCityDropdown(value.length > 0 && filteredCities.length > 0)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -411,24 +450,53 @@ export const ProfileSetup: React.FC = () => {
                   </div>
                   
                   <div className="relative">
-                    <select
-                      value={profile.city}
-                      onChange={(e) => handleCityChange(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    <input
+                      type="text"
+                      value={citySearch}
+                      onChange={handleCitySearchChange}
+                      onFocus={() => setShowCityDropdown(citySearch.length > 0 && filteredCities.length > 0)}
+                      placeholder={loadingCities ? 'Carregando cidades...' : 'Digite o nome da sua cidade'}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                       required
                       disabled={!selectedStateAbbr || loadingCities}
-                    >
-                      <option value="">
-                        {loadingCities ? 'Carregando...' : 'Selecione a cidade'}
-                      </option>
-                      {cities.map((city) => (
-                        <option key={city.id} value={city.name}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
+                    
+                    {/* Dropdown de cidades filtradas */}
+                    {showCityDropdown && filteredCities.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredCities.map((city) => (
+                          <button
+                            key={city.id}
+                            type="button"
+                            onClick={() => handleCityChange(city.name)}
+                            className="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                          >
+                            {city.name}
+                          </button>
+                        ))}
+                        {cities.length > 50 && (
+                          <div className="px-4 py-2 text-sm text-gray-500 bg-gray-50">
+                            {cities.length - 50} cidades adicionais disponíveis. Continue digitando para refinar a busca.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {cities.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {cities.length} cidades disponíveis
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Mensagem de ajuda para busca de cidade */}
+                {selectedStateAbbr && !loadingCities && (
+                  <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
+                    💡 <strong>Dica:</strong> Digite o nome da sua cidade para encontrá-la rapidamente. 
+                    {cities.length > 0 && ` ${cities.length} cidades disponíveis para ${profile.state}.`}
+                  </div>
+                )}
 
                 <div className="flex justify-between">
                   <button
@@ -441,7 +509,7 @@ export const ProfileSetup: React.FC = () => {
                   <button
                     type="button"
                     onClick={nextStep}
-                    disabled={!profile.name || !profile.age || !profile.city || !selectedStateAbbr || parseInt(profile.age) < 18 || parseInt(profile.age) > 99}
+                    disabled={!profile.name || !profile.age || !profile.city || !selectedStateAbbr || parseInt(profile.age) < 18 || parseInt(profile.age) > 99 || !cities.some(city => city.name === profile.city)}
                     className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50"
                   >
                     Próximo

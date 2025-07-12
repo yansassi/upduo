@@ -19,6 +19,7 @@ function AppContent() {
   const [currentProfileToViewId, setCurrentProfileToViewId] = useState<string | null>(null)
   const [hasAnyUnreadMessages, setHasAnyUnreadMessages] = useState(false)
   const [matchesRefreshTrigger, setMatchesRefreshTrigger] = useState(0)
+  const [isUserPremium, setIsUserPremium] = useState(false)
 
   useEffect(() => {
     console.log('AppContent: User state changed', { user, loading })
@@ -37,7 +38,7 @@ function AppContent() {
       console.log('AppContent: Starting profile check query...')
       const { data, error, count } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, is_premium')
         .eq('id', user.id)
         .maybeSingle()
 
@@ -46,14 +47,17 @@ function AppContent() {
       if (error) {
         console.error('AppContent: Profile check failed with unexpected error', error)
         setHasProfile(false)
+        setIsUserPremium(false)
       } else {
         const profileExists = !!data
         console.log('AppContent: Profile exists:', profileExists)
         setHasProfile(profileExists)
+        setIsUserPremium(data?.is_premium || false)
       }
     } catch (error) {
       console.error('AppContent: Profile check failed with exception', error)
       setHasProfile(false)
+      setIsUserPremium(false)
     } finally {
       console.log('AppContent: Setting profileLoading to false')
       setProfileLoading(false)
@@ -173,7 +177,12 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {renderContent()}
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} hasAnyUnreadMessages={hasAnyUnreadMessages} />
+      <Navigation 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        hasAnyUnreadMessages={hasAnyUnreadMessages}
+        isUserPremium={isUserPremium}
+      />
     </div>
   )
 }

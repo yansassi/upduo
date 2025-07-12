@@ -166,6 +166,13 @@ export const PremiumArea: React.FC = () => {
                 <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                   <Check className="w-4 h-4 text-white" />
                 </div>
+                <span className="text-gray-700">Botão voltar perfil</span>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="w-4 h-4 text-white" />
+                </div>
                 <span className="text-gray-700">Filtros avançados de busca</span>
               </div>
               
@@ -485,12 +492,10 @@ export const PremiumArea: React.FC = () => {
                   >
                     Cancelar
                   </button>
-                </div>
-                
-                <div className="mt-6 p-4 bg-blue-50 rounded-xl">
-                  <p className="text-sm text-blue-800">
-                    💬 Resposta rápida garantida durante horário comercial
-                  </p>
+                  
+                  <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+                    <span className="text-sm font-medium text-blue-800">💎 Premium inclui: 100 swipes, badge verificado, botão voltar e prioridade!</span>
+                  </div>
                 </div>
               </div>
             </motion.div>

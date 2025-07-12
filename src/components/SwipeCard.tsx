@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { MapPin, Calendar, Trophy, Sword, Target, Quote, User, BadgeCheck } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
+import { getStateAbbrByCity } from '../utils/locationUtils'
 
 interface Profile {
   id: string
@@ -22,6 +23,24 @@ interface SwipeCardProps {
 }
 
 export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
+  const [stateAbbr, setStateAbbr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchStateAbbr = async () => {
+      if (profile.city) {
+        try {
+          const abbr = await getStateAbbrByCity(profile.city)
+          setStateAbbr(abbr)
+        } catch (error) {
+          console.error('Error fetching state abbreviation:', error)
+          setStateAbbr(null)
+        }
+      }
+    }
+
+    fetchStateAbbr()
+  }, [profile.city])
+
   return (
     <motion.div
       drag="x"
@@ -66,16 +85,16 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
             {profile.is_premium && (
               <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
             )}
-            <div className="flex items-center mb-2">
-              <h2 className="text-3xl font-bold">{profile.name}</h2>
-              {profile.is_premium && (
-                <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <MapPin className="w-4 h-4" />
-              <span className="text-sm">{profile.city}</span>
-            </div>
+          </div>
+          <div className="flex items-center space-x-2 mb-1">
+            <Calendar className="w-4 h-4" />
+            <span className="text-sm">{profile.age} anos</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-4 h-4" />
+            <span className="text-sm">
+              {profile.city}{stateAbbr ? `, ${stateAbbr}` : ''}
+            </span>
           </div>
         </div>
       </div>

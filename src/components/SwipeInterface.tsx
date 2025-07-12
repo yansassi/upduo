@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { SwipeCard } from './SwipeCard'
-import { Heart, X, Sparkles, Users, Clock, Crown } from 'lucide-react'
-import { useSwipeLimits, incrementSwipeCount } from '../hooks/useSwipeLimits'
+import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw } from 'lucide-react'
+import { useSwipeLimits, incrementSwipeCount, decrementSwipeCount } from '../hooks/useSwipeLimits'
 
 interface Profile {
   id: string
@@ -18,12 +18,20 @@ interface Profile {
   is_premium: boolean
 }
 
+interface LastSwipeInfo {
+  profile: Profile
+  swipeId: string
+  direction: 'left' | 'right'
+}
+
 export const SwipeInterface: React.FC = () => {
   const { user } = useAuth()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [matchFound, setMatchFound] = useState<Profile | null>(null)
+  const [lastSwipeInfo, setLastSwipeInfo] = useState<LastSwipeInfo | null>(null)
+  const [rewindLoading, setRewindLoading] = useState(false)
   const swipeLimits = useSwipeLimits()
 
   useEffect(() => {
@@ -79,10 +87,10 @@ export const SwipeInterface: React.FC = () => {
 
       if (error) {
         console.error('SwipeInterface: Error fetching profiles', error)
-        // Don't throw, just set empty array
         setProfiles([])
       } else {
         setProfiles(profiles || [])
+        setCurrentIndex(0) // Reset index when fetching new profiles
       }
     } catch (error) {
       console.error('Error fetching profiles:', error)
@@ -110,7 +118,7 @@ export const SwipeInterface: React.FC = () => {
         .from('profiles')
         .select('*')
         .neq('id', user.id)
-        .limit(5) // Carregar menos perfis por vez
+        .limit(5)
 
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`)
@@ -130,8 +138,23 @@ export const SwipeInterface: React.FC = () => {
   }
 
   const handleSwipe = async (direction: 'left' | 'right') => {
-    if (!user || currentIndex >= profiles.length) return
+    if (!user || currentIndex >= profiles.length || !swipeLimits.canSwipe) {
+      console.log('SwipeInterface: Cannot swipe', {
+        hasUser: !!user,
+        currentIndex,
+        profilesLength: profiles.length,
+        canSwipe: swipeLimits.canSwipe
+      })
+      return
+    }
+
     const swipedProfile = profiles[currentIndex]
+    
+    if (!swipedProfile) {
+      console.error('SwipeInterface: No profile found at current index', currentIndex)
+      return
+    }
+    
     const isLike = direction === 'right'
 
     // Scroll to top when swiping
@@ -142,10 +165,30 @@ export const SwipeInterface: React.FC = () => {
       isLike,
       swiperId: user.id,
       swipedId: swipedProfile.id,
-      swipedProfileName: swipedProfile.name
+      swipedProfileName: swipedProfile.name,
+      currentIndex
     })
 
     try {
+      // Check if this swipe already exists (safety check)
+      const { data: existingSwipe, error: checkError } = await supabase
+        .from('swipes')
+        .select('id')
+        .eq('swiper_id', user.id)
+        .eq('swiped_id', swipedProfile.id)
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('SwipeInterface: Error checking existing swipe', checkError)
+        throw checkError
+      }
+
+      if (existingSwipe) {
+        console.warn('SwipeInterface: Swipe already exists, skipping to next profile')
+        setCurrentIndex(prev => prev + 1)
+        return
+      }
+
       // Record the swipe
       const { data: swipeData, error: swipeError } = await supabase
         .from('swipes')
@@ -158,13 +201,62 @@ export const SwipeInterface: React.FC = () => {
 
       console.log('SwipeInterface: Swipe insertion result', { swipeData, swipeError })
 
-      if (swipeError) throw swipeError
+      if (swipeError) {
+        console.error('SwipeInterface: Error inserting swipe', {
+          error: swipeError,
+          swiperId: user.id,
+          swipedId: swipedProfile.id,
+          isLike,
+          errorCode: swipeError.code,
+          errorMessage: swipeError.message,
+          errorDetails: swipeError.details
+        })
+        
+        // Handle specific error cases
+        if (swipeError.code === '23505') {
+          console.warn('SwipeInterface: Duplicate swipe detected, moving to next profile')
+          setCurrentIndex(prev => prev + 1)
+          return
+        }
+        
+        throw swipeError
+      }
+
+      // Increment swipe count
+      const swipeCountUpdated = await incrementSwipeCount(user.id)
+      if (!swipeCountUpdated) {
+        console.warn('SwipeInterface: Failed to update swipe count')
+      }
+
+      // Store the last swipe info for premium users to potentially rewind
+      if (swipeLimits.isPremium && swipeData && swipeData.length > 0) {
+        setLastSwipeInfo({
+          profile: swipedProfile,
+          swipeId: swipeData[0].id,
+          direction
+        })
+        console.log('SwipeInterface: Stored last swipe info for rewind', {
+          profileName: swipedProfile.name,
+          swipeId: swipeData[0].id,
+          direction
+        })
+      }
+
+      // Move to next profile AFTER storing swipe info
+      setCurrentIndex(prev => prev + 1)
+      console.log('SwipeInterface: Moving to next profile', { 
+        oldIndex: currentIndex, 
+        newIndex: currentIndex + 1 
+      })
+
+      // Refresh swipe limits to update remaining count
+      swipeLimits.refresh()
 
       // Check for match if it's a like
       if (isLike) {
         console.log('SwipeInterface: Checking for mutual like...')
         
-        const { data: existingSwipe, error: checkError } = await supabase
+        const { data: mutualSwipe, error: mutualCheckError } = await supabase
           .from('swipes')
           .select('*')
           .eq('swiper_id', swipedProfile.id)
@@ -172,13 +264,13 @@ export const SwipeInterface: React.FC = () => {
           .eq('is_like', true)
           .maybeSingle()
 
-        console.log('SwipeInterface: Mutual like check result', { existingSwipe, checkError })
+        console.log('SwipeInterface: Mutual like check result', { mutualSwipe, mutualCheckError })
 
-        if (checkError) {
-          console.error('SwipeInterface: Error checking for mutual like', checkError)
+        if (mutualCheckError) {
+          console.error('SwipeInterface: Error checking for mutual like', mutualCheckError)
         }
 
-        if (existingSwipe) {
+        if (mutualSwipe) {
           // It's a match!
           console.log('SwipeInterface: Creating match!')
           
@@ -205,32 +297,139 @@ export const SwipeInterface: React.FC = () => {
               setMatchFound(swipedProfile)
             } else {
               console.error('SwipeInterface: Error creating match', matchError)
-              // Don't throw here, just log the error
             }
           } else {
             console.log('SwipeInterface: Match created successfully!')
             setMatchFound(swipedProfile)
           }
-        } else {
-          console.log('SwipeInterface: No mutual like found, no match created')
         }
-      } else {
-        console.log('SwipeInterface: Swipe was not a like, skipping match check')
-      }
-
-      // Move to next profile
-      console.log('SwipeInterface: Moving to next profile')
-      setCurrentIndex(currentIndex + 1)
-
-      // Increment swipe count after successful swipe
-      const swipeCountUpdated = await incrementSwipeCount(user.id)
-      if (!swipeCountUpdated) {
-        console.warn('SwipeInterface: Failed to update swipe count')
       }
     } catch (error) {
       console.error('Error handling swipe:', error)
-      // Show user-friendly error message
-      alert('Erro ao processar swipe. Tente novamente.')
+      
+      // More specific error handling
+      let errorMessage = 'Erro ao processar swipe. Tente novamente.'
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorObj = error as any
+        if (errorObj.message?.includes('duplicate key')) {
+          errorMessage = 'Você já avaliou este perfil. Passando para o próximo...'
+          setCurrentIndex(prev => prev + 1)
+          return
+        }
+      }
+      
+      alert(errorMessage)
+    }
+  }
+
+  const handleRewind = async () => {
+    if (!user || !swipeLimits.isPremium || !lastSwipeInfo || rewindLoading) {
+      console.log('SwipeInterface: Cannot rewind', {
+        hasUser: !!user,
+        isPremium: swipeLimits.isPremium,
+        hasLastSwipeInfo: !!lastSwipeInfo,
+        rewindLoading
+      })
+      return
+    }
+
+    console.log('SwipeInterface: Starting rewind process', {
+      userId: user.id,
+      lastSwipedProfile: lastSwipeInfo.profile.name,
+      swipeId: lastSwipeInfo.swipeId,
+      direction: lastSwipeInfo.direction,
+      currentIndex
+    })
+
+    setRewindLoading(true)
+    try {
+      // 1. Delete the swipe record from database
+      console.log('SwipeInterface: Attempting to delete swipe record', {
+        swipeId: lastSwipeInfo.swipeId,
+        userId: user.id
+      })
+      
+      const { error: deleteError } = await supabase
+        .from('swipes')
+        .delete()
+        .eq('id', lastSwipeInfo.swipeId)
+        .eq('swiper_id', user.id) // Extra security check
+
+      if (deleteError) {
+        console.error('SwipeInterface: Error deleting swipe record', {
+          error: deleteError,
+          swipeId: lastSwipeInfo.swipeId,
+          errorCode: deleteError.code,
+          errorMessage: deleteError.message,
+          errorDetails: deleteError.details
+        })
+        throw deleteError
+      }
+
+      console.log('SwipeInterface: Successfully deleted swipe record')
+
+      // 2. Decrement the daily swipe count
+      const swipeCountDecremented = await decrementSwipeCount(user.id)
+      if (!swipeCountDecremented) {
+        console.warn('SwipeInterface: Failed to decrement swipe count')
+      }
+
+      // 3. Restore the profile and fix the state
+      const restoredProfile = lastSwipeInfo.profile
+      const newIndex = Math.max(0, currentIndex - 1)
+
+      console.log('SwipeInterface: Restoring profile', {
+        profileName: restoredProfile.name,
+        newIndex,
+        currentIndex
+      })
+
+      // Insert the profile back at the correct position
+      setProfiles(prev => {
+        const newProfiles = [...prev]
+        // Remove the profile if it exists in the array to avoid duplicates
+        const existingIndex = newProfiles.findIndex(p => p.id === restoredProfile.id)
+        if (existingIndex !== -1) {
+          newProfiles.splice(existingIndex, 1)
+        }
+        // Insert at the correct position
+        newProfiles.splice(newIndex, 0, restoredProfile)
+        return newProfiles
+      })
+
+      // Set index back to the restored profile
+      setCurrentIndex(newIndex)
+
+      // 4. Clear the last swipe info
+      setLastSwipeInfo(null)
+
+      // 5. Refresh swipe limits
+      swipeLimits.refresh()
+
+      console.log('SwipeInterface: Rewind completed successfully', {
+        restoredProfileName: restoredProfile.name,
+        newIndex
+      })
+
+    } catch (error) {
+      console.error('Error handling rewind:', error)
+      
+      // Provide more specific error messages
+      let errorMessage = 'Erro ao desfazer último swipe. Tente novamente.'
+      
+      if (error && typeof error === 'object' && 'code' in error) {
+        const supabaseError = error as any
+        if (supabaseError.code === '42501') {
+          errorMessage = 'Permissão negada. Você não pode desfazer este swipe.'
+        } else if (supabaseError.code === '23503') {
+          errorMessage = 'Erro de integridade dos dados. Tente novamente.'
+        }
+      }
+      
+      alert(errorMessage)
+    } finally {
+      setRewindLoading(false)
     }
   }
 
@@ -266,9 +465,22 @@ export const SwipeInterface: React.FC = () => {
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
         </div>
+
+        {/* Swipe Limits Info */}
+        <div className="text-center mb-4">
+          <div className="inline-flex items-center space-x-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-full px-4 py-2">
+            <span className="text-white text-sm">
+              {swipeLimits.remainingSwipes} swipes restantes
+            </span>
+            {swipeLimits.isPremium && (
+              <Crown className="w-4 h-4 text-yellow-400" />
+            )}
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentProfile.id}
+            key={`profile-${currentProfile.id}-${currentIndex}`}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
@@ -282,7 +494,29 @@ export const SwipeInterface: React.FC = () => {
         </AnimatePresence>
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-6 mt-8 mb-4">
+        <div className="flex justify-center items-center space-x-4 mt-8 mb-4">
+          {/* Rewind Button - Only for Premium users */}
+          {swipeLimits.isPremium && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleRewind}
+              disabled={!lastSwipeInfo || rewindLoading}
+              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                !lastSwipeInfo || rewindLoading
+                  ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                  : 'bg-yellow-500 hover:bg-yellow-600'
+              }`}
+              title="Desfazer último swipe (Premium)"
+            >
+              {rewindLoading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <RotateCcw className="w-6 h-6 text-white" />
+              )}
+            </motion.button>
+          )}
+          
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -311,6 +545,18 @@ export const SwipeInterface: React.FC = () => {
             <Heart className="w-8 h-8 text-white" />
           </motion.button>
         </div>
+        
+        {/* Premium Rewind Info */}
+        {swipeLimits.isPremium && (
+          <div className="text-center mb-4">
+            <p className="text-xs text-blue-200">
+              {lastSwipeInfo 
+                ? `💎 Você pode desfazer o último ${lastSwipeInfo.direction === 'right' ? 'like' : 'pass'}` 
+                : '💎 Funcionalidade Premium: Desfazer swipes'
+              }
+            </p>
+          </div>
+        )}
 
         {/* No swipes left overlay */}
         {!swipeLimits.canSwipe && (

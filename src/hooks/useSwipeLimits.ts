@@ -6,8 +6,10 @@ interface SwipeLimitData {
   dailyLimit: number
   remainingSwipes: number
   canSwipe: boolean
+  isPremium: boolean
   loading: boolean
   error: string | null
+  refresh: () => void
 }
 
 export const useSwipeLimits = (): SwipeLimitData => {
@@ -16,8 +18,10 @@ export const useSwipeLimits = (): SwipeLimitData => {
     dailyLimit: 30,
     remainingSwipes: 30,
     canSwipe: true,
+    isPremium: false,
     loading: true,
-    error: null
+    error: null,
+    refresh: () => {}
   })
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
@@ -52,8 +56,10 @@ export const useSwipeLimits = (): SwipeLimitData => {
           dailyLimit: 30,
           remainingSwipes: 30,
           canSwipe: true,
+          isPremium: false,
           loading: false,
-          error: null
+          error: null,
+          refresh: refreshSwipeData
         })
         return
       }
@@ -80,8 +86,10 @@ export const useSwipeLimits = (): SwipeLimitData => {
           dailyLimit,
           remainingSwipes: dailyLimit,
           canSwipe: true,
+          isPremium,
           loading: false,
-          error: null
+          error: null,
+          refresh: refreshSwipeData
         })
         return
       }
@@ -101,8 +109,10 @@ export const useSwipeLimits = (): SwipeLimitData => {
         dailyLimit,
         remainingSwipes,
         canSwipe,
+        isPremium,
         loading: false,
-        error: null
+        error: null,
+        refresh: refreshSwipeData
       })
 
     } catch (error) {
@@ -111,8 +121,10 @@ export const useSwipeLimits = (): SwipeLimitData => {
         dailyLimit: 30,
         remainingSwipes: 30,
         canSwipe: true,
+        isPremium: false,
         loading: false,
-        error: error instanceof Error ? error.message : 'Erro ao carregar dados de swipe'
+        error: error instanceof Error ? error.message : 'Erro ao carregar dados de swipe',
+        refresh: refreshSwipeData
       }))
     }
   }
@@ -126,7 +138,65 @@ export const incrementSwipeCount = async (userId: string): Promise<boolean> => {
     
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
     
-    // First, get current count
+    // Use RPC function to safely increment the count
+    const { data, error } = await supabase
+      .rpc('increment_daily_swipe_count', {
+        p_user_id: userId,
+        p_date: today
+      })
+
+    if (error) {
+      console.error('incrementSwipeCount: RPC failed', error)
+      
+      // Fallback to manual upsert if RPC doesn't exist
+      const { data: currentData, error: selectError } = await supabase
+        .from('daily_swipe_counts')
+        .select('swipe_count')
+        .eq('user_id', userId)
+        .eq('date', today)
+        .maybeSingle()
+
+      if (selectError) {
+        console.error('incrementSwipeCount: Error getting current count', selectError)
+        return false
+      }
+
+      const currentCount = currentData?.swipe_count || 0
+      const newCount = currentCount + 1
+
+      console.log('incrementSwipeCount: Current count:', currentCount, 'New count:', newCount)
+
+      const { error: upsertError } = await supabase
+        .from('daily_swipe_counts')
+        .upsert({
+          user_id: userId,
+          date: today,
+          swipe_count: newCount
+        }, {
+          onConflict: 'user_id,date'
+        })
+
+      if (upsertError) {
+        console.error('incrementSwipeCount: Upsert failed', upsertError)
+        return false
+      }
+    }
+
+    console.log('incrementSwipeCount: Successfully incremented swipe count')
+    return true
+  } catch (error) {
+    console.error('incrementSwipeCount: Exception occurred', error)
+    return false
+  }
+}
+
+export const decrementSwipeCount = async (userId: string): Promise<boolean> => {
+  try {
+    console.log('decrementSwipeCount: Decrementing swipe count for user', userId)
+    
+    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+    
+    // Get current count
     const { data: currentData, error: selectError } = await supabase
       .from('daily_swipe_counts')
       .select('swipe_count')
@@ -135,35 +205,33 @@ export const incrementSwipeCount = async (userId: string): Promise<boolean> => {
       .maybeSingle()
 
     if (selectError) {
-      console.error('incrementSwipeCount: Error getting current count', selectError)
+      console.error('decrementSwipeCount: Error getting current count', selectError)
       return false
     }
 
     const currentCount = currentData?.swipe_count || 0
-    const newCount = currentCount + 1
+    const newCount = Math.max(0, currentCount - 1) // Don't go below 0
 
-    console.log('incrementSwipeCount: Current count:', currentCount, 'New count:', newCount)
+    console.log('decrementSwipeCount: Current count:', currentCount, 'New count:', newCount)
 
-    // Upsert the new count
-    const { error: upsertError } = await supabase
+    // Update the count
+    const { error: updateError } = await supabase
       .from('daily_swipe_counts')
-      .upsert({
-        user_id: userId,
-        date: today,
+      .update({
         swipe_count: newCount
-      }, {
-        onConflict: 'user_id,date'
       })
+      .eq('user_id', userId)
+      .eq('date', today)
 
-    if (upsertError) {
-      console.error('incrementSwipeCount: Upsert failed', upsertError)
+    if (updateError) {
+      console.error('decrementSwipeCount: Update failed', updateError)
       return false
     }
 
-    console.log('incrementSwipeCount: Successfully incremented swipe count')
+    console.log('decrementSwipeCount: Successfully decremented swipe count')
     return true
   } catch (error) {
-    console.error('incrementSwipeCount: Exception occurred', error)
+    console.error('decrementSwipeCount: Exception occurred', error)
     return false
   }
 }

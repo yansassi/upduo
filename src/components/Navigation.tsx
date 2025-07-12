@@ -6,9 +6,15 @@ interface NavigationProps {
   activeTab: string
   onTabChange: (tab: string) => void
   hasAnyUnreadMessages?: boolean
+  isUserPremium?: boolean
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange, hasAnyUnreadMessages = false }) => {
+export const Navigation: React.FC<NavigationProps> = ({ 
+  activeTab, 
+  onTabChange, 
+  hasAnyUnreadMessages = false,
+  isUserPremium = false
+}) => {
 
   const tabs = [
     { id: 'discover', label: 'Descobrir', icon: Users },
@@ -26,8 +32,20 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange, 
             onClick={() => onTabChange(id)}
             className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
               activeTab === id
-                ? `${id === 'matches' && hasAnyUnreadMessages ? 'text-green-600 bg-green-50' : 'text-blue-600 bg-blue-50'}`
-                : `${id === 'matches' && hasAnyUnreadMessages ? 'text-green-600 hover:text-green-800' : 'text-gray-600 hover:text-gray-800'}`
+                ? `${
+                    id === 'matches' && hasAnyUnreadMessages 
+                      ? 'text-green-600 bg-green-50' 
+                      : id === 'premium' && isUserPremium
+                      ? 'text-yellow-500 bg-yellow-50'
+                      : 'text-blue-600 bg-blue-50'
+                  }`
+                : `${
+                    id === 'matches' && hasAnyUnreadMessages 
+                      ? 'text-green-600 hover:text-green-800' 
+                      : id === 'premium' && isUserPremium
+                      ? 'text-yellow-500 hover:text-yellow-600'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`
             }`}
           >
             <Icon className="w-5 h-5" />

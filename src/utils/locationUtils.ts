@@ -81,6 +81,7 @@ export const fetchStates = async (): Promise<State[]> => {
 export const fetchCitiesByState = async (stateAbbr: string): Promise<City[]> => {
   console.log('LocationUtils: fetchCitiesByState called with stateAbbr:', stateAbbr)
   try {
+    // Buscar TODAS as cidades do estado sem qualquer limite
     const { data, error } = await supabase
       .from('locations')
       .select('*')
@@ -91,7 +92,15 @@ export const fetchCitiesByState = async (stateAbbr: string): Promise<City[]> => 
 
     if (error) throw error
 
-    console.log('LocationUtils: cities found for state', stateAbbr, ':', data?.length || 0, 'cities')
+    const citiesCount = data?.length || 0
+    console.log('LocationUtils: cities found for state', stateAbbr, ':', citiesCount, 'cities')
+    
+    // Log algumas cidades para verificar se estão sendo carregadas
+    if (data && data.length > 0) {
+      console.log('LocationUtils: First 10 cities:', data.slice(0, 10).map(c => c.name))
+      console.log('LocationUtils: Last 10 cities:', data.slice(-10).map(c => c.name))
+    }
+    
     return data || []
   } catch (error) {
     console.error('LocationUtils: Error fetching cities for state', stateAbbr, ':', error)

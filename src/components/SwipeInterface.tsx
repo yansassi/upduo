@@ -683,32 +683,6 @@ export const SwipeInterface: React.FC = () => {
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
-          
-          {/* Filter Status - Only show if filters are applied */}
-          {swipeLimits.isPremium && (
-            <div className="mt-4 flex items-center justify-center space-x-2">
-              {getActiveFiltersCount() > 0 ? (
-                <div className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-full">
-                  <Zap className="w-4 h-4" />
-                  <span className="text-sm">{getActiveFiltersCount()} filtros ativos</span>
-                  <Crown className="w-4 h-4 text-yellow-300" />
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2 bg-white bg-opacity-20 text-white px-4 py-2 rounded-full">
-                  <Settings className="w-4 h-4" />
-                  <span className="text-sm">Configure filtros na aba Premium</span>
-                  <Crown className="w-4 h-4 text-yellow-300" />
-                </div>
-              )}
-              
-              {filters.compatibilityMode && (
-                <div className="flex items-center space-x-1 bg-green-500 bg-opacity-20 text-green-200 px-3 py-1 rounded-full">
-                  <Zap className="w-3 h-3" />
-                  <span className="text-xs">Modo Compatibilidade</span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Swipe Limits Info */}

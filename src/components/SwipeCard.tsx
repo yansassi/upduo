@@ -82,9 +82,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
         <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
           <div className="flex items-center mb-2">
             <h2 className="text-3xl font-bold">{profile.name}</h2>
-            {profile.is_premium && (
-              <BadgeCheck className="w-6 h-6 text-blue-400 ml-2 drop-shadow-lg" />
-            )}
           </div>
           <div className="flex items-center space-x-2 mb-1">
             <Calendar className="w-4 h-4" />

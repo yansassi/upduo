@@ -313,11 +313,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack }) =
             <div className="flex items-center space-x-3 mb-4">
               <Trophy className="w-6 h-6 text-yellow-600" />
               <h3 className="text-xl font-bold text-gray-800">Elo Atual</h3>
-              {profile.is_premium && (
-                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg ml-auto">
-                  ⭐ PREMIUM
-                </div>
-              )}
             </div>
             <div className="flex items-center space-x-4">
               <img

@@ -70,7 +70,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
   const states = [...new Set(locations.map(loc => loc.state_abbr))];
   const citiesInSelectedStates = locations.filter(loc => 
-    filters.selectedStates.length === 0 || filters.selectedStates.includes(loc.state_abbr)
+    (filters.selectedStates || []).length === 0 || (filters.selectedStates || []).includes(loc.state_abbr)
   );
 
   const PremiumUpsell = () => (
@@ -162,14 +162,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   key={rank.id}
                   onClick={() => {
                     if (!isPremium) return;
-                    const newRanks = filters.selectedRanks.includes(rank.id)
-                      ? filters.selectedRanks.filter(r => r !== rank.id)
-                      : [...filters.selectedRanks, rank.id];
+                    const newRanks = (filters.selectedRanks || []).includes(rank.id)
+                      ? (filters.selectedRanks || []).filter(r => r !== rank.id)
+                      : [...(filters.selectedRanks || []), rank.id];
                     updateFilters({ selectedRanks: newRanks });
                   }}
                   disabled={!isPremium}
                   className={`p-3 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 ${
-                    filters.selectedRanks.includes(rank.id)
+                    (filters.selectedRanks || []).includes(rank.id)
                       ? 'bg-blue-100 border-blue-300 text-blue-800'
                       : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
@@ -189,14 +189,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   key={state}
                   onClick={() => {
                     if (!isPremium) return;
-                    const newStates = filters.selectedStates.includes(state)
-                      ? filters.selectedStates.filter(s => s !== state)
-                      : [...filters.selectedStates, state];
+                    const newStates = (filters.selectedStates || []).includes(state)
+                      ? (filters.selectedStates || []).filter(s => s !== state)
+                      : [...(filters.selectedStates || []), state];
                     updateFilters({ selectedStates: newStates, selectedCities: [] });
                   }}
                   disabled={!isPremium}
                   className={`p-2 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 ${
-                    filters.selectedStates.includes(state)
+                    (filters.selectedStates || []).includes(state)
                       ? 'bg-blue-100 border-blue-300 text-blue-800'
                       : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
@@ -208,7 +208,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           </div>
 
           {/* Cities */}
-          {filters.selectedStates.length > 0 && (
+          {(filters.selectedStates || []).length > 0 && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">Cidades</label>
               <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
@@ -217,14 +217,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     key={location.id}
                     onClick={() => {
                       if (!isPremium) return;
-                      const newCities = filters.selectedCities.includes(location.name)
-                        ? filters.selectedCities.filter(c => c !== location.name)
-                        : [...filters.selectedCities, location.name];
+                      const newCities = (filters.selectedCities || []).includes(location.name)
+                        ? (filters.selectedCities || []).filter(c => c !== location.name)
+                        : [...(filters.selectedCities || []), location.name];
                       updateFilters({ selectedCities: newCities });
                     }}
                     disabled={!isPremium}
                     className={`p-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${
-                      filters.selectedCities.includes(location.name)
+                      (filters.selectedCities || []).includes(location.name)
                         ? 'bg-blue-100 border-blue-300 text-blue-800'
                         : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                     }`}
@@ -245,14 +245,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   key={lane.id}
                   onClick={() => {
                     if (!isPremium) return;
-                    const newLanes = filters.selectedLanes.includes(lane.id)
-                      ? filters.selectedLanes.filter(l => l !== lane.id)
-                      : [...filters.selectedLanes, lane.id];
+                    const newLanes = (filters.selectedLanes || []).includes(lane.id)
+                      ? (filters.selectedLanes || []).filter(l => l !== lane.id)
+                      : [...(filters.selectedLanes || []), lane.id];
                     updateFilters({ selectedLanes: newLanes });
                   }}
                   disabled={!isPremium}
                   className={`p-3 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 ${
-                    filters.selectedLanes.includes(lane.id)
+                    (filters.selectedLanes || []).includes(lane.id)
                       ? 'bg-blue-100 border-blue-300 text-blue-800'
                       : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
@@ -272,14 +272,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   key={hero.id}
                   onClick={() => {
                     if (!isPremium) return;
-                    const newHeroes = filters.selectedHeroes.includes(hero.id)
-                      ? filters.selectedHeroes.filter(h => h !== hero.id)
-                      : [...filters.selectedHeroes, hero.id];
+                    const newHeroes = (filters.selectedHeroes || []).includes(hero.id)
+                      ? (filters.selectedHeroes || []).filter(h => h !== hero.id)
+                      : [...(filters.selectedHeroes || []), hero.id];
                     updateFilters({ selectedHeroes: newHeroes });
                   }}
                   disabled={!isPremium}
                   className={`p-2 rounded-lg border text-xs transition-colors disabled:opacity-50 ${
-                    filters.selectedHeroes.includes(hero.id)
+                    (filters.selectedHeroes || []).includes(hero.id)
                       ? 'bg-blue-100 border-blue-300 text-blue-800'
                       : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}

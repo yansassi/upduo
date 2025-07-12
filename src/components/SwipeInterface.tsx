@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { SwipeCard } from './SwipeCard'
-import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw } from 'lucide-react'
+import { FilterModal, FilterCriteria } from './FilterModal'
+import { Heart, X, Sparkles, Users, Clock, Crown, RotateCcw, Filter, Zap } from 'lucide-react'
 import { useSwipeLimits, incrementSwipeCount, decrementSwipeCount } from '../hooks/useSwipeLimits'
 
 interface Profile {
@@ -32,6 +33,19 @@ export const SwipeInterface: React.FC = () => {
   const [matchFound, setMatchFound] = useState<Profile | null>(null)
   const [lastSwipeInfo, setLastSwipeInfo] = useState<LastSwipeInfo | null>(null)
   const [rewindLoading, setRewindLoading] = useState(false)
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [filters, setFilters] = useState<FilterCriteria>({
+    minAge: 18,
+    maxAge: 35,
+    selectedRanks: [],
+    selectedCities: [],
+    selectedStates: [],
+    selectedLines: [],
+    selectedHeroes: [],
+    maxDistance: 100,
+    compatibilityMode: true
+  })
+  const [filtersApplied, setFiltersApplied] = useState(false)
   const swipeLimits = useSwipeLimits()
 
   useEffect(() => {
@@ -53,7 +67,7 @@ export const SwipeInterface: React.FC = () => {
   const fetchProfiles = async () => {
     if (!user) return
 
-    console.log('SwipeInterface: Fetching profiles for user', user.id)
+    console.log('SwipeInterface: Fetching profiles for user', user.id, 'with filters:', filters)
     setLoading(true)
 
     try {
@@ -63,35 +77,16 @@ export const SwipeInterface: React.FC = () => {
         .select('swiped_id')
         .eq('swiper_id', user.id)
 
-      console.log('SwipeInterface: Previously swiped profiles', swipedProfiles)
+      console.log('SwipeInterface: Previously swiped profiles count:', swipedProfiles?.length || 0)
 
       const swipedIds = swipedProfiles?.map(s => s.swiped_id) || []
       
-      console.log('SwipeInterface: Swiped IDs array', swipedIds)
-
-      // Build query conditionally based on whether there are swiped profiles
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .neq('id', user.id)
-        .limit(10)
-
-      // Only add the 'not in' filter if there are actually swiped profiles
-      if (swipedIds.length > 0) {
-        query = query.not('id', 'in', `(${swipedIds.join(',')})`)
-      }
-
-      const { data: profiles, error } = await query
-
-      console.log('SwipeInterface: Fetched profiles', { profiles, error })
-
-      if (error) {
-        console.error('SwipeInterface: Error fetching profiles', error)
-        setProfiles([])
-      } else {
-        setProfiles(profiles || [])
-        setCurrentIndex(0) // Reset index when fetching new profiles
-      }
+      // Build query with filters
+      const profiles = await fetchProfilesWithFilters(swipedIds, 10)
+      
+      console.log('SwipeInterface: Fetched profiles count:', profiles?.length || 0)
+      setProfiles(profiles || [])
+      setCurrentIndex(0)
     } catch (error) {
       console.error('Error fetching profiles:', error)
       setProfiles([])
@@ -114,19 +109,7 @@ export const SwipeInterface: React.FC = () => {
       const loadedIds = profiles.map(p => p.id)
       const excludedIds = [...swipedIds, ...loadedIds]
       
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .neq('id', user.id)
-        .limit(5)
-
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`)
-      }
-
-      const { data: newProfiles, error } = await query
-
-      if (error) throw error
+      const newProfiles = await fetchProfilesWithFilters(excludedIds, 5)
       
       if (newProfiles && newProfiles.length > 0) {
         setProfiles(prev => [...prev, ...newProfiles])
@@ -137,6 +120,240 @@ export const SwipeInterface: React.FC = () => {
     }
   }
 
+  const fetchProfilesWithFilters = async (excludedIds: string[], limit: number): Promise<Profile[]> => {
+    console.log('SwipeInterface: Building query with filters', { filters, excludedIds: excludedIds.length, limit })
+    
+    // Start with base query
+    let query = supabase
+      .from('profiles')
+      .select('*')
+      .neq('id', user!.id)
+
+    // Exclude already swiped/loaded profiles
+    if (excludedIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`)
+    }
+
+    // Apply age filters
+    if (filters.minAge > 18) {
+      query = query.gte('age', filters.minAge)
+    }
+    if (filters.maxAge < 99) {
+      query = query.lte('age', filters.maxAge)
+    }
+
+    // Apply rank filters
+    if (filters.selectedRanks.length > 0) {
+      query = query.in('current_rank', filters.selectedRanks)
+    }
+
+    // Apply city filters
+    if (filters.selectedCities.length > 0) {
+      query = query.in('city', filters.selectedCities)
+    }
+
+    // Apply hero filters (overlaps for array fields)
+    if (filters.selectedHeroes.length > 0) {
+      query = query.overlaps('favorite_heroes', filters.selectedHeroes)
+    }
+
+    // Apply line filters
+    if (filters.selectedLines.length > 0) {
+      query = query.overlaps('favorite_lines', filters.selectedLines)
+    }
+
+    // Execute query
+    const { data: baseProfiles, error } = await query.limit(limit * 3) // Get more to allow for compatibility sorting
+
+    if (error) {
+      console.error('SwipeInterface: Error in base query', error)
+      throw error
+    }
+
+    if (!baseProfiles || baseProfiles.length === 0) {
+      return []
+    }
+
+    console.log('SwipeInterface: Base profiles found:', baseProfiles.length)
+
+    // Apply compatibility algorithm if enabled
+    if (filters.compatibilityMode && swipeLimits.isPremium) {
+      const sortedProfiles = await applyCompatibilityAlgorithm(baseProfiles)
+      return sortedProfiles.slice(0, limit)
+    }
+
+    return baseProfiles.slice(0, limit)
+  }
+
+  const applyCompatibilityAlgorithm = async (profiles: Profile[]): Promise<Profile[]> => {
+    console.log('SwipeInterface: Applying compatibility algorithm to', profiles.length, 'profiles')
+    
+    // Get current user's profile for compatibility calculation
+    const { data: currentUserProfile } = await supabase
+      .from('profiles')
+      .select('favorite_heroes, favorite_lines, current_rank')
+      .eq('id', user!.id)
+      .single()
+
+    if (!currentUserProfile) {
+      console.warn('SwipeInterface: Could not get current user profile for compatibility')
+      return profiles
+    }
+
+    // Calculate compatibility scores
+    const profilesWithScores = profiles.map(profile => {
+      let score = 0
+      
+      // Line compatibility (highest weight)
+      const lineCompatibility = calculateLineCompatibility(
+        currentUserProfile.favorite_lines, 
+        profile.favorite_lines
+      )
+      score += lineCompatibility * 40
+      
+      // Hero synergy (medium weight)
+      const heroSynergy = calculateHeroSynergy(
+        currentUserProfile.favorite_heroes, 
+        profile.favorite_heroes
+      )
+      score += heroSynergy * 30
+      
+      // Rank proximity (medium weight)
+      const rankProximity = calculateRankProximity(
+        currentUserProfile.current_rank, 
+        profile.current_rank
+      )
+      score += rankProximity * 30
+      
+      return { ...profile, compatibilityScore: score }
+    })
+
+    // Sort by compatibility score (highest first)
+    const sortedProfiles = profilesWithScores
+      .sort((a, b) => (b.compatibilityScore || 0) - (a.compatibilityScore || 0))
+      .map(({ compatibilityScore, ...profile }) => profile) // Remove score from final result
+
+    console.log('SwipeInterface: Profiles sorted by compatibility')
+    return sortedProfiles
+  }
+
+  const calculateLineCompatibility = (userLines: string[], profileLines: string[]): number => {
+    // Define complementary line pairs
+    const complementaryPairs: Record<string, string[]> = {
+      'gold': ['roam', 'jungle'],
+      'mid': ['jungle', 'roam'],
+      'exp': ['roam', 'jungle'],
+      'jungle': ['gold', 'mid', 'exp'],
+      'roam': ['gold', 'mid', 'exp']
+    }
+    
+    let maxCompatibility = 0
+    
+    for (const userLine of userLines) {
+      const complementary = complementaryPairs[userLine] || []
+      for (const profileLine of profileLines) {
+        if (complementary.includes(profileLine)) {
+          maxCompatibility = Math.max(maxCompatibility, 1)
+        } else if (userLine === profileLine) {
+          // Same line is less compatible (they might compete)
+          maxCompatibility = Math.max(maxCompatibility, 0.3)
+        }
+      }
+    }
+    
+    return maxCompatibility
+  }
+
+  const calculateHeroSynergy = (userHeroes: string[], profileHeroes: string[]): number => {
+    // Define hero synergy groups (simplified)
+    const synergyGroups: Record<string, string[]> = {
+      // Tank + ADC synergy
+      'Tigreal': ['Layla', 'Miya', 'Bruno', 'Clint'],
+      'Franco': ['Granger', 'Bruno', 'Karrie'],
+      'Johnson': ['Odette', 'Aurora', 'Kagura'],
+      
+      // Support + ADC synergy
+      'Angela': ['Granger', 'Bruno', 'Karrie', 'Wanwan'],
+      'Estes': ['Layla', 'Miya', 'Hanabi'],
+      'Rafaela': ['Bruno', 'Clint', 'Moskov'],
+      
+      // Assassin + Mage synergy
+      'Gusion': ['Aurora', 'Eudora', 'Kagura'],
+      'Lancelot': ['Odette', 'Chang\'e', 'Lunox'],
+      'Hayabusa': ['Pharsa', 'Cyclops', 'Harley']
+    }
+    
+    let maxSynergy = 0
+    
+    for (const userHero of userHeroes) {
+      const synergyHeroes = synergyGroups[userHero] || []
+      for (const profileHero of profileHeroes) {
+        if (synergyHeroes.includes(profileHero)) {
+          maxSynergy = Math.max(maxSynergy, 1)
+        } else if (userHero === profileHero) {
+          // Same hero is neutral
+          maxSynergy = Math.max(maxSynergy, 0.5)
+        }
+      }
+    }
+    
+    return maxSynergy
+  }
+
+  const calculateRankProximity = (userRank: string, profileRank: string): number => {
+    const rankOrder = ['Warrior', 'Elite', 'Master', 'Grandmaster', 'Epic', 'Legend', 'Mythic', 'Mythical Glory']
+    
+    const userIndex = rankOrder.indexOf(userRank)
+    const profileIndex = rankOrder.indexOf(profileRank)
+    
+    if (userIndex === -1 || profileIndex === -1) return 0.5
+    
+    const difference = Math.abs(userIndex - profileIndex)
+    
+    // Perfect match
+    if (difference === 0) return 1
+    // One rank difference
+    if (difference === 1) return 0.8
+    // Two ranks difference
+    if (difference === 2) return 0.6
+    // Three or more ranks difference
+    return Math.max(0.2, 1 - (difference * 0.2))
+  }
+
+  const handleApplyFilters = () => {
+    console.log('SwipeInterface: Applying filters and refetching profiles')
+    setFiltersApplied(true)
+    fetchProfiles()
+  }
+
+  const handleResetFilters = () => {
+    console.log('SwipeInterface: Resetting filters')
+    setFilters({
+      minAge: 18,
+      maxAge: 35,
+      selectedRanks: [],
+      selectedCities: [],
+      selectedStates: [],
+      selectedLines: [],
+      selectedHeroes: [],
+      maxDistance: 100,
+      compatibilityMode: true
+    })
+    setFiltersApplied(false)
+    fetchProfiles()
+  }
+
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (filters.minAge !== 18 || filters.maxAge !== 35) count++
+    if (filters.selectedRanks.length > 0) count++
+    if (filters.selectedCities.length > 0) count++
+    if (filters.selectedStates.length > 0) count++
+    if (filters.selectedLines.length > 0) count++
+    if (filters.selectedHeroes.length > 0) count++
+    if (!filters.compatibilityMode) count++
+    return count
+  }
   const handleSwipe = async (direction: 'left' | 'right') => {
     if (!user || currentIndex >= profiles.length || !swipeLimits.canSwipe) {
       console.log('SwipeInterface: Cannot swipe', {
@@ -465,6 +682,38 @@ export const SwipeInterface: React.FC = () => {
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">Encontre seu Duo</h1>
           <p className="text-blue-200">Deslize para encontrar jogadores compatíveis</p>
+          
+          {/* Filter Status */}
+          {swipeLimits.isPremium && (
+            <div className="mt-4 flex items-center justify-center space-x-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowFilterModal(true)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                  getActiveFiltersCount() > 0
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-sm">
+                  {getActiveFiltersCount() > 0 
+                    ? `${getActiveFiltersCount()} filtros ativos` 
+                    : 'Filtros Avançados'
+                  }
+                </span>
+                <Crown className="w-4 h-4 text-yellow-300" />
+              </motion.button>
+              
+              {filters.compatibilityMode && (
+                <div className="flex items-center space-x-1 bg-green-500 bg-opacity-20 text-green-200 px-3 py-1 rounded-full">
+                  <Zap className="w-3 h-3" />
+                  <span className="text-xs">Modo Compatibilidade</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Swipe Limits Info */}
@@ -490,6 +739,7 @@ export const SwipeInterface: React.FC = () => {
             <SwipeCard
               profile={currentProfile}
               onSwipe={handleSwipe}
+              showCompatibility={filters.compatibilityMode && swipeLimits.isPremium}
             />
           </motion.div>
         </AnimatePresence>
@@ -655,6 +905,16 @@ export const SwipeInterface: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Filter Modal */}
+      <FilterModal
+        isOpen={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onApplyFilters={handleApplyFilters}
+        isPremium={swipeLimits.isPremium}
+      />
     </div>
   )
 }

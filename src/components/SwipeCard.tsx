@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, Calendar, Trophy, Sword, Target, Quote, User, BadgeCheck } from 'lucide-react'
+import { MapPin, Calendar, Trophy, Sword, Target, Quote, User, BadgeCheck, Zap } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 import { getStateAbbrByCity } from '../utils/locationUtils'
+import { calculateCompatibility, getCompatibilityDescription, getCompatibilityColor } from '../utils/compatibilityUtils'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 interface Profile {
   id: string
@@ -20,10 +23,14 @@ interface Profile {
 interface SwipeCardProps {
   profile: Profile
   onSwipe: (direction: 'left' | 'right') => void
+  showCompatibility?: boolean
 }
 
-export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
+export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe, showCompatibility = false }) => {
+  const { user } = useAuth()
   const [stateAbbr, setStateAbbr] = useState<string | null>(null)
+  const [compatibility, setCompatibility] = useState<any>(null)
+  const [loadingCompatibility, setLoadingCompatibility] = useState(false)
 
   useEffect(() => {
     const fetchStateAbbr = async () => {
@@ -40,6 +47,34 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
 
     fetchStateAbbr()
   }, [profile.city])
+
+  useEffect(() => {
+    if (showCompatibility && user) {
+      fetchCompatibility()
+    }
+  }, [showCompatibility, user, profile.id])
+
+  const fetchCompatibility = async () => {
+    if (!user) return
+    
+    setLoadingCompatibility(true)
+    try {
+      const { data: currentUserProfile } = await supabase
+        .from('profiles')
+        .select('favorite_heroes, favorite_lines, current_rank, city')
+        .eq('id', user.id)
+        .single()
+
+      if (currentUserProfile) {
+        const compatibilityScore = calculateCompatibility(currentUserProfile, profile)
+        setCompatibility(compatibilityScore)
+      }
+    } catch (error) {
+      console.error('Error calculating compatibility:', error)
+    } finally {
+      setLoadingCompatibility(false)
+    }
+  }
 
   return (
     <motion.div
@@ -93,6 +128,20 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
               {profile.city}{stateAbbr ? `, ${stateAbbr}` : ''}
             </span>
           </div>
+          
+          {/* Compatibility Badge */}
+          {showCompatibility && compatibility && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center space-x-2 bg-black bg-opacity-50 backdrop-blur-sm rounded-full px-3 py-1 mt-2"
+            >
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className={`text-sm font-medium ${getCompatibilityColor(compatibility.overallScore)}`}>
+                {Math.round(compatibility.overallScore * 100)}% compatível
+              </span>
+            </motion.div>
+          )}
         </div>
       </div>
 
@@ -110,6 +159,57 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
           />
           <span className="text-xl font-bold text-gray-800">{profile.current_rank}</span>
         </div>
+        
+        {/* Detailed Compatibility */}
+        {showCompatibility && compatibility && !loadingCompatibility && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+              <Zap className="w-4 h-4 mr-1 text-blue-600" />
+              Análise de Compatibilidade
+            </h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Linhas:</span>
+                <span className={`font-medium ${getCompatibilityColor(compatibility.lineCompatibility)}`}>
+                  {Math.round(compatibility.lineCompatibility * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Heróis:</span>
+                <span className={`font-medium ${getCompatibilityColor(compatibility.heroSynergy)}`}>
+                  {Math.round(compatibility.heroSynergy * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Elo:</span>
+                <span className={`font-medium ${getCompatibilityColor(compatibility.rankProximity)}`}>
+                  {Math.round(compatibility.rankProximity * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Local:</span>
+                <span className={`font-medium ${getCompatibilityColor(compatibility.locationProximity)}`}>
+                  {Math.round(compatibility.locationProximity * 100)}%
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-800">Geral:</span>
+                <span className={`text-sm font-bold ${getCompatibilityColor(compatibility.overallScore)}`}>
+                  {getCompatibilityDescription(compatibility.overallScore)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {showCompatibility && loadingCompatibility && (
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <span className="text-xs text-gray-600">Calculando compatibilidade...</span>
+          </div>
+        )}
       </div>
 
       {/* Heroes */}
@@ -165,9 +265,16 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ profile, onSwipe }) => {
 
       {/* Swipe Hint */}
       <div className="p-4 bg-gray-50 text-center">
-        <p className="text-xs text-gray-500">
-          Arraste para a esquerda para passar • Arraste para a direita para curtir
-        </p>
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">
+            Arraste para a esquerda para passar • Arraste para a direita para curtir
+          </p>
+          {showCompatibility && (
+            <p className="text-xs text-blue-600 font-medium">
+              💎 Análise de compatibilidade ativa
+            </p>
+          )}
+        </div>
       </div>
     </motion.div>
   )

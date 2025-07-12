@@ -219,6 +219,7 @@ export const SwipeInterface: React.FC = () => {
           return
         }
         
+        // For any other error, throw it to be caught by outer try-catch
         throw swipeError
       }
 

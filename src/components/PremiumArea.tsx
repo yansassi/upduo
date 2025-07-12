@@ -29,16 +29,7 @@ export const PremiumArea: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [showContactModal, setShowContactModal] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
-  const [originalFilters, setOriginalFilters] = useState<FilterCriteria>({
-    minAge: 18,
-    maxAge: 35,
-    selectedRanks: [],
-    selectedCities: [],
-    selectedStates: [],
-    selectedLines: [],
-    selectedHeroes: [],
-    compatibilityMode: true
-  })
+  const [originalFilters, setOriginalFilters] = useState<FilterCriteria | null>(null)
   const [isSavingFilters, setIsSavingFilters] = useState(false)
   const [filters, setFilters] = useState<FilterCriteria>({
     minAge: 18,
@@ -46,7 +37,7 @@ export const PremiumArea: React.FC = () => {
     selectedRanks: [],
     selectedCities: [],
     selectedStates: [],
-    selectedLines: [],
+    selectedLanes: [],
     selectedHeroes: [],
     compatibilityMode: true
   })
@@ -230,16 +221,18 @@ export const PremiumArea: React.FC = () => {
   }
 
   const hasUnsavedChanges = () => {
+    if (!originalFilters) return false
     return JSON.stringify(filters) !== JSON.stringify(originalFilters)
   }
 
   const handleFiltersChange = (newFilters: FilterCriteria) => {
+    console.log('PremiumArea: Filters changed:', newFilters)
     setFilters(newFilters)
   }
 
   const handleCloseFilterModal = () => {
-    // Reset filters to original state if there are unsaved changes
-    if (hasUnsavedChanges()) {
+    // Reset filters to original state if there are unsaved changes and original filters exist
+    if (hasUnsavedChanges() && originalFilters) {
       setFilters(originalFilters)
     }
     setShowFilterModal(false)
@@ -565,7 +558,8 @@ export const PremiumArea: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                setOriginalFilters(filters) // Store current state as baseline
+                // Store current state as baseline when opening modal
+                setOriginalFilters({ ...filters })
                 setShowFilterModal(true)
               }}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center space-x-2"

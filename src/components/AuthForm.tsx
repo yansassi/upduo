@@ -46,7 +46,7 @@ export const AuthForm: React.FC = () => {
         : await signUp(email, password)
 
       if (error) {
-        setError(error.message)
+        setError(error.message || 'Erro na autenticação')
       }
     } catch (err) {
       setError('Ocorreu um erro inesperado')

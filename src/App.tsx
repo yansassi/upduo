@@ -9,7 +9,7 @@ import PremiumArea from './components/PremiumArea'
 import { InaugurationEvent } from './components/InaugurationEvent'
 import { ChatInterface } from './components/ChatInterface'
 import { Navigation } from './components/Navigation'
-import { supabase } from './lib/supabase'
+import { apiClient } from './lib/api'
 
 function AppContent() {
   const { user, loading, error } = useAuth()
@@ -37,30 +37,26 @@ function AppContent() {
 
     try {
       console.log('AppContent: Starting profile check query...')
-      const { data, error, count } = await supabase
-        .from('profiles')
-        .select('id, is_premium')
-        .eq('id', user.id)
-        .maybeSingle()
+      const response = await apiClient.getProfile(user.id)
 
-      console.log('AppContent: Profile check result', { data, error, count, hasData: !!data })
+      console.log('AppContent: Profile check result', { response })
       
-      if (error) {
-        console.error('AppContent: Profile check failed with unexpected error', error)
+      if (!response.success) {
+        console.error('AppContent: Profile check failed with unexpected error', response.error)
         console.log('AppContent: Signing out due to profile check error (possibly offline)')
-        await signOut()
+        // await signOut() // Comentado temporariamente até implementar signOut
         setHasProfile(false)
         setIsUserPremium(false)
       } else {
-        const profileExists = !!data
+        const profileExists = !!response.data
         console.log('AppContent: Profile exists:', profileExists)
         setHasProfile(profileExists)
-        setIsUserPremium(data?.is_premium || false)
+        setIsUserPremium(response.data?.is_premium || false)
       }
     } catch (error) {
       console.error('AppContent: Profile check failed with exception', error)
       console.log('AppContent: Signing out due to profile check exception (possibly offline)')
-      await signOut()
+      // await signOut() // Comentado temporariamente até implementar signOut
       setHasProfile(false)
       setIsUserPremium(false)
     } finally {

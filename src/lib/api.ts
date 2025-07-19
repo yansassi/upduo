@@ -40,7 +40,8 @@ class ApiClient {
       
       const config: RequestInit = {
         headers: {
-          'Content-Type': 'application/json',
+          // Don't set Content-Type for FormData, browser handles it automatically
+          ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
           ...(token && { 'Authorization': `Bearer ${token}` }),
           ...options.headers,
         },
@@ -120,6 +121,17 @@ class ApiClient {
     })
   }
 }
+  // NEW METHOD FOR AVATAR UPLOAD
+  async uploadAvatar(userId: string, file: File): Promise<ApiResponse<{ avatar_url: string }>> {
+    const formData = new FormData()
+    formData.append('user_id', userId)
+    formData.append('avatar', file)
+
+    return this.request<{ avatar_url: string }>('/upload_avatar.php', {
+      method: 'POST',
+      body: formData
+    })
+  }
 
 export const apiClient = new ApiClient(API_BASE_URL)
 
@@ -144,6 +156,10 @@ export const authStorage = {
   
   getUser: (): User | null => {
     const userData = localStorage.getItem('user_data')
+    // Handle the case where userData is the string "undefined"
+    if (userData === "undefined") {
+      return null
+    }
     return userData ? JSON.parse(userData) : null
   },
   

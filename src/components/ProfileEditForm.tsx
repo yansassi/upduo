@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { apiClient } from '../lib/api'
 import { HEROES, RANKS, LINES, getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 import { fetchStates, fetchCitiesByState, getStateAbbrByCity, State, City } from '../utils/locationUtils'
 import { COUNTRIES, getCountryByCode } from '../utils/countryUtils'
@@ -245,64 +245,39 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
           type: avatarFile.type
         })
         
-        const fileExt = avatarFile.name.split('.').pop()
-        const fileName = `${user.id}/avatar.${fileExt}`
-        
-        console.log('ProfileEditForm: Upload path:', fileName)
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, avatarFile, {
-            upsert: true
-          })
-        
-        if (uploadError) {
-          console.error('ProfileEditForm: Error uploading avatar', uploadError)
-          throw uploadError
+        // Upload via PHP API instead of Supabase Storage
+        const uploadResponse = await apiClient.uploadAvatar(user.id, avatarFile)
+
+        if (!uploadResponse.success) {
+          console.error('ProfileEditForm: Error uploading avatar via API', uploadResponse.error)
+          throw new Error(uploadResponse.error || 'Erro ao enviar avatar')
         }
         
-        console.log('ProfileEditForm: Upload successful:', uploadData)
-        
-        // Obter URL pública da nova imagem
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(fileName)
-        
-        avatar_url = publicUrl
-        console.log('ProfileEditForm: New avatar uploaded successfully', avatar_url)
-        
-        // Validate URL format
-        console.log('ProfileEditForm: URL validation:', {
-          isValidUrl: avatar_url.startsWith('http'),
-          containsSupabase: avatar_url.includes('supabase'),
-          containsAvatars: avatar_url.includes('avatars'),
-          fileName: fileName,
-          fullUrl: avatar_url
-        })
+        avatar_url = uploadResponse.data?.avatar_url
+        console.log('ProfileEditForm: New avatar uploaded successfully via API', avatar_url)
       }
       
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          name: profile.name,
-          age: parseInt(profile.age),
-          country: profile.country,
-          city: profile.city,
-          current_rank: profile.current_rank,
-          favorite_heroes: profile.favorite_heroes,
-          favorite_lines: profile.favorite_lines,
-          bio: profile.bio,
-          avatar_url,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
-        .select()
+      // Update profile via PHP API instead of Supabase
+      const profileData = {
+        name: profile.name,
+        age: parseInt(profile.age),
+        country: profile.country,
+        city: profile.city,
+        current_rank: profile.current_rank,
+        favorite_heroes: profile.favorite_heroes,
+        favorite_lines: profile.favorite_lines,
+        bio: profile.bio,
+        avatar_url,
+        updated_at: new Date().toISOString()
+      }
+
+      const { data, error } = await apiClient.updateProfile(user.id, profileData)
 
       console.log('ProfileEditForm: Profile update result', { data, error })
       
-      if (error) {
+      if (!data.success) {
         console.error('ProfileEditForm: Error updating profile', error)
-        throw error
+        throw new Error(error || 'Erro ao atualizar perfil')
       }
       
       console.log('ProfileEditForm: Profile updated successfully')

@@ -1,5 +1,4 @@
-// Configuração da API para o servidor PHP
-const API_BASE_URL = 'http://localhost:8080/api' // Local PHP server
+const API_BASE_URL = 'https://upduo.top/api' // HostGator PHP server
 
 export interface ApiResponse<T = any> {
   success: boolean

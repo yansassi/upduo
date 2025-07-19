@@ -120,18 +120,19 @@ class ApiClient {
       body: JSON.stringify({ id: userId, ...profileData })
     })
   }
-}
-  // NEW METHOD FOR AVATAR UPLOAD
-  async uploadAvatar(userId: string, file: File): Promise<ApiResponse<{ avatar_url: string }>> {
-    const formData = new FormData()
-    formData.append('user_id', userId)
-    formData.append('avatar', file)
 
-    return this.request<{ avatar_url: string }>('/upload_avatar.php', {
-      method: 'POST',
-      body: formData
-    })
-  }
+ // NEW METHOD FOR AVATAR UPLOAD
+ async uploadAvatar(userId: string, file: File): Promise<ApiResponse<{ avatar_url: string }>> {
+   const formData = new FormData()
+   formData.append('user_id', userId)
+   formData.append('avatar', file)
+
+   return this.request<{ avatar_url: string }>('/upload_avatar.php', {
+     method: 'POST',
+     body: formData
+   })
+ }
+}
 
 export const apiClient = new ApiClient(API_BASE_URL)
 

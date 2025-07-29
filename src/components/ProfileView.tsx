@@ -6,6 +6,7 @@ import { ProfileEditForm } from './ProfileEditForm'
 import { FilterModal, FilterCriteria } from './FilterModal'
 import { Edit2, MapPin, Calendar, Trophy, Sword, Target, Quote, ArrowLeft, User, AlertCircle, BadgeCheck, LogOut, Diamond, Wallet, X, MessageSquare, Settings } from 'lucide-react'
 import { FileText } from 'lucide-react'
+import { Copy, Share, Users } from 'lucide-react'
 import { getHeroImageUrl, getRankImageUrl, getLineImageUrl } from '../constants/gameData'
 import { RANKS, HEROES, LINES } from '../constants/gameData'
 import { fetchAllLocations, getStateAbbrByCity } from '../utils/locationUtils'
@@ -57,6 +58,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack, onG
   const [stateAbbr, setStateAbbr] = useState<string | null>(null)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
+  const [showReferralModal, setShowReferralModal] = useState(false)
+  const [referralCodeCopied, setReferralCodeCopied] = useState(false)
   const [withdrawalStep, setWithdrawalStep] = useState(1) // 1: amount, 2: ML credentials
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
   const [mlUserId, setMlUserId] = useState('')
@@ -390,6 +393,50 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack, onG
       setWithdrawalStep(1)
     }
   }
+
+  const copyReferralCode = async () => {
+    if (!profile?.referral_code) return;
+    
+    try {
+      await navigator.clipboard.writeText(profile.referral_code);
+      setReferralCodeCopied(true);
+      setTimeout(() => setReferralCodeCopied(false), 2000);
+    } catch (error) {
+      console.error('Error copying referral code:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = profile.referral_code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setReferralCodeCopied(true);
+      setTimeout(() => setReferralCodeCopied(false), 2000);
+    }
+  };
+
+  const shareReferralCode = async () => {
+    if (!profile?.referral_code) return;
+    
+    const shareText = `🎮 Junte-se a mim no UpDuo! Use meu código de indicação: ${profile.referral_code}\n\nBaixe o app: https://upduo.top`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'UpDuo - Encontre seu Duo',
+          text: shareText,
+          url: 'https://upduo.top'
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+        copyReferralCode();
+      }
+    } else {
+      // Fallback to WhatsApp
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+  };
 
   const getWithdrawalModalContent = () => {
     const whatsappNumber = '5545988349638'
@@ -868,11 +915,79 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack, onG
             </motion.div>
           )}
 
+          {/* Referral Section - Only show on own profile */}
+          {isOwnProfile && profile?.referral_code && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50"
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <Users className="w-6 h-6 text-green-600" />
+                <h3 className="text-xl font-bold text-gray-800">Indique Amigos</h3>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-gray-600 text-sm">
+                  Compartilhe seu código e ganhe recompensas quando seus amigos se cadastrarem!
+                </p>
+                
+                <div className="bg-white rounded-lg p-4 border-2 border-dashed border-green-300">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-2">Seu código de indicação:</p>
+                    <div className="text-3xl font-bold text-green-600 mb-3 font-mono tracking-wider">
+                      {profile.referral_code}
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={copyReferralCode}
+                        className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                          referralCodeCopied
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>{referralCodeCopied ? 'Copiado!' : 'Copiar'}</span>
+                      </motion.button>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={shareReferralCode}
+                        className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-all"
+                      >
+                        <Share className="w-4 h-4" />
+                        <span>Compartilhar</span>
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2 text-blue-800 mb-2">
+                    <span className="text-lg">🎁</span>
+                    <span className="text-sm font-medium">Recompensas por indicação:</span>
+                  </div>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    <li>• Você ganha 10 diamantes quando alguém usar seu código</li>
+                    <li>• Seu amigo também ganha 5 diamantes de bônus</li>
+                    <li>• Sem limite de indicações!</li>
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Heroes Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: 0.8 }}
             className="p-6 border-b border-gray-200"
           >
             <div className="flex items-center space-x-3 mb-4">
@@ -904,7 +1019,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack, onG
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 0.9 }}
             className="p-6 border-b border-gray-200"
           >
             <div className="flex items-center space-x-3 mb-4">
@@ -936,7 +1051,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profileId, onBack, onG
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
+            transition={{ delay: 1.0 }}
             className="p-6 bg-gray-50 space-y-4"
           >
             <div className="text-center">

@@ -6,6 +6,7 @@ import { HEROES, RANKS, LINES, getHeroImageUrl, getRankImageUrl, getLineImageUrl
 import { fetchStates, fetchCitiesByState, State, City } from '../utils/locationUtils'
 import { COUNTRIES, Country } from '../utils/countryUtils'
 import { User, MapPin, Calendar, Trophy, Sword, Target, Camera, Upload } from 'lucide-react'
+import { nanoid } from 'nanoid'
 
 export const ProfileSetup: React.FC = () => {
   const { user } = useAuth()
@@ -21,6 +22,8 @@ export const ProfileSetup: React.FC = () => {
   const [lineSearch, setLineSearch] = useState('')
   const [citySearch, setCitySearch] = useState('')
   const [showCityDropdown, setShowCityDropdown] = useState(false)
+  const [generatedReferralCode, setGeneratedReferralCode] = useState<string | null>(null)
+  const [referralCodeInput, setReferralCodeInput] = useState('')
   const [profile, setProfile] = useState({
     name: '',
     age: '',
@@ -83,6 +86,66 @@ export const ProfileSetup: React.FC = () => {
     setProfile({...profile, name: limitedValue})
   }
 
+  // New function to generate a unique referral code
+  const generateUniqueReferralCode = async (): Promise<string> => {
+    let code: string;
+    let isUnique = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10; // Limit attempts to prevent infinite loops
+
+    while (!isUnique && attempts < MAX_ATTEMPTS) {
+      // Generate a random alphanumeric string (8 characters long)
+      code = nanoid(8).toUpperCase(); // Make it uppercase for better readability
+      
+      // Check if the code already exists in the database
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('referral_code')
+        .eq('referral_code', code)
+        .maybeSingle(); // Use maybeSingle to check if any record exists
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is good
+        console.error('ProfileSetup: Error checking referral code uniqueness:', error);
+        throw new Error('Failed to check referral code uniqueness.');
+      } else if (!data) {
+        // If no data is returned, the code is unique
+        isUnique = true;
+      }
+      attempts++;
+    }
+
+    if (!isUnique) {
+      console.error('ProfileSetup: Failed to generate a unique referral code after multiple attempts.');
+      throw new Error('Failed to generate unique referral code.');
+    }
+    
+    console.log('ProfileSetup: Generated unique referral code:', code);
+    return code;
+  };
+
+  // Function to validate and get referrer user ID
+  const validateReferralCode = async (code: string): Promise<string | null> => {
+    if (!code.trim()) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('referral_code', code.trim().toUpperCase())
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('ProfileSetup: Error validating referral code:', error);
+        return null;
+      }
+
+      return data?.id || null;
+    } catch (error) {
+      console.error('ProfileSetup: Exception validating referral code:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     loadStates()
     // Fechar dropdown quando clicar fora
@@ -95,6 +158,20 @@ export const ProfileSetup: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Call generateUniqueReferralCode when the component mounts
+  useEffect(() => {
+    const fetchCode = async () => {
+      try {
+        const code = await generateUniqueReferralCode();
+        setGeneratedReferralCode(code);
+      } catch (err) {
+        // Handle error if code generation fails
+        console.error('ProfileSetup: Error setting initial referral code:', err);
+      }
+    };
+    fetchCode();
+  }, []); // Empty dependency array means this runs once on mount
 
   useEffect(() => {
     if (selectedStateAbbr) {
@@ -156,19 +233,32 @@ export const ProfileSetup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
+    if (!user || !generatedReferralCode) return // Ensure code is generated
 
     console.log('ProfileSetup: Attempting to create profile', {
       userId: user.id,
       email: user.email,
       profile: {
         ...profile,
-        age: parseInt(profile.age)
+        age: parseInt(profile.age),
+        referral_code: generatedReferralCode // Include the generated code
       }
     })
 
     setLoading(true)
     try {
+      // Validate referral code if provided
+      let referredByUserId = null;
+      if (referralCodeInput.trim()) {
+        referredByUserId = await validateReferralCode(referralCodeInput);
+        if (!referredByUserId) {
+          alert('Código de indicação inválido. Verifique o código e tente novamente.');
+          setLoading(false);
+          return;
+        }
+        console.log('ProfileSetup: Valid referral code, referred by user:', referredByUserId);
+      }
+
       let avatar_url = null
       
       // Upload da foto de perfil se selecionada
@@ -230,6 +320,8 @@ export const ProfileSetup: React.FC = () => {
           favorite_lines: profile.favorite_lines,
           bio: profile.bio,
           avatar_url,
+          referral_code: generatedReferralCode, // Add the generated referral code here
+          referred_by_user_id: referredByUserId, // Add the referrer's user ID if valid
           is_premium: false,
           diamond_count: 0,
           min_age_filter: 18,
@@ -250,6 +342,25 @@ export const ProfileSetup: React.FC = () => {
       if (error) {
         console.error('ProfileSetup: Error creating profile', error)
         throw error
+      }
+      
+      // If user was referred, give rewards to both users
+      if (referredByUserId) {
+        try {
+          console.log('ProfileSetup: Processing referral rewards...');
+          const { error: rewardError } = await supabase.rpc('process_referral_rewards', {
+            p_referrer_id: referredByUserId,
+            p_referee_id: user.id
+          });
+          
+          if (rewardError) {
+            console.error('ProfileSetup: Error processing referral rewards:', rewardError);
+          } else {
+            console.log('ProfileSetup: Referral rewards processed successfully');
+          }
+        } catch (rewardError) {
+          console.error('ProfileSetup: Exception processing referral rewards:', rewardError);
+        }
       }
       
       console.log('ProfileSetup: Profile created successfully, reloading page')
@@ -454,6 +565,21 @@ export const ProfileSetup: React.FC = () => {
                       min="18"
                       max="99"
                     />
+                  </div>
+                </div>
+
+                {/* Referral Code Input */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={referralCodeInput}
+                    onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Código de indicação (opcional)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxLength={8}
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    💎 Se um amigo te indicou, digite o código dele aqui para ganhar recompensas!
                   </div>
                 </div>
 

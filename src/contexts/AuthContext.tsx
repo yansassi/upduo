@@ -34,6 +34,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('AuthProvider: Updating user activity for user', userId)
       
+      // First check if the user profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single()
+      
+      if (profileError || !profile) {
+        console.log('AuthProvider: Profile does not exist yet, skipping user activity update')
+        return
+      }
+      
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('User activity update timeout')), 5000)

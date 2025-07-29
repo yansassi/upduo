@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('id')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       
       if (profileError || !profile) {
         console.log('AuthProvider: Profile does not exist yet, skipping user activity update')

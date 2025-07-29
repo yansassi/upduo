@@ -247,18 +247,6 @@ export const ProfileSetup: React.FC = () => {
 
     setLoading(true)
     try {
-      // Validate referral code if provided
-      let referredByUserId = null;
-      if (referralCodeInput.trim()) {
-        referredByUserId = await validateReferralCode(referralCodeInput);
-        if (!referredByUserId) {
-          alert('Código de indicação inválido. Verifique o código e tente novamente.');
-          setLoading(false);
-          return;
-        }
-        console.log('ProfileSetup: Valid referral code, referred by user:', referredByUserId);
-      }
-
       let avatar_url = null
       
       // Upload da foto de perfil se selecionada
@@ -321,7 +309,8 @@ export const ProfileSetup: React.FC = () => {
           bio: profile.bio,
           avatar_url,
           referral_code: generatedReferralCode, // Add the generated referral code here
-          referred_by_user_id: referredByUserId, // Add the referrer's user ID if valid
+          referred_by_user_id: null, // Não validar código de indicação
+          entered_referral_code_text: referralCodeInput.trim().toUpperCase() || null, // Armazenar código digitado
           is_premium: false,
           diamond_count: 0,
           min_age_filter: 18,
@@ -342,25 +331,6 @@ export const ProfileSetup: React.FC = () => {
       if (error) {
         console.error('ProfileSetup: Error creating profile', error)
         throw error
-      }
-      
-      // If user was referred, give rewards to both users
-      if (referredByUserId) {
-        try {
-          console.log('ProfileSetup: Processing referral rewards...');
-          const { error: rewardError } = await supabase.rpc('process_referral_rewards', {
-            p_referrer_id: referredByUserId,
-            p_referee_id: user.id
-          });
-          
-          if (rewardError) {
-            console.error('ProfileSetup: Error processing referral rewards:', rewardError);
-          } else {
-            console.log('ProfileSetup: Referral rewards processed successfully');
-          }
-        } catch (rewardError) {
-          console.error('ProfileSetup: Exception processing referral rewards:', rewardError);
-        }
       }
       
       console.log('ProfileSetup: Profile created successfully, reloading page')
@@ -579,7 +549,7 @@ export const ProfileSetup: React.FC = () => {
                     maxLength={8}
                   />
                   <div className="text-xs text-gray-500 mt-1">
-                    💎 Se um amigo te indicou, digite o código dele aqui para ganhar recompensas!
+                    💎 Se um amigo te indicou, digite o código dele aqui!
                   </div>
                 </div>
 

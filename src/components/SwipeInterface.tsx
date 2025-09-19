@@ -169,10 +169,13 @@ export const SwipeInterface: React.FC = () => {
     if (!swipeLimits.isPremium) {
       console.log('SwipeInterface: User is not premium, ignoring all filters')
       
-      // Start with base query - no filters applied for non-premium users
+      // Start with base query - no filters applied for non-premium users, but order by recent activity
       let query = supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          user_activity!inner(last_login)
+        `)
         .neq('id', user!.id)
 
       // Exclude already swiped/loaded profiles
@@ -180,8 +183,10 @@ export const SwipeInterface: React.FC = () => {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`)
       }
 
-      // Execute query without any filters
-      const { data: profiles, error } = await query.limit(limit)
+      // Order by last login (most recent first) and execute query
+      const { data: profiles, error } = await query
+        .order('last_login', { ascending: false, foreignTable: 'user_activity' })
+        .limit(limit)
 
       if (error) {
         console.error('SwipeInterface: Error in non-premium query', error)
@@ -189,13 +194,23 @@ export const SwipeInterface: React.FC = () => {
       }
 
       console.log('SwipeInterface: Non-premium profiles found:', profiles?.length || 0)
-      return profiles || []
+      
+      // Transform the data to remove the nested user_activity object
+      const transformedProfiles = profiles?.map(profile => {
+        const { user_activity, ...profileData } = profile
+        return profileData
+      }) || []
+      
+      return transformedProfiles
     }
     
-    // Start with base query
+    // Start with base query for premium users - include user_activity for ordering
     let query = supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        *,
+        user_activity!inner(last_login)
+      `)
       .neq('id', user!.id)
 
     // Exclude already swiped/loaded profiles
@@ -232,7 +247,9 @@ export const SwipeInterface: React.FC = () => {
     }
 
     // Execute query
-    const { data: baseProfiles, error } = await query.limit(limit * 3) // Get more to allow for compatibility sorting
+    const { data: baseProfiles, error } = await query
+      .order('last_login', { ascending: false, foreignTable: 'user_activity' })
+      .limit(limit * 3) // Get more to allow for compatibility sorting
 
     if (error) {
       console.error('SwipeInterface: Error in base query', error)
@@ -245,13 +262,19 @@ export const SwipeInterface: React.FC = () => {
 
     console.log('SwipeInterface: Base profiles found:', baseProfiles.length)
 
+    // Transform the data to remove the nested user_activity object
+    const transformedProfiles = baseProfiles.map(profile => {
+      const { user_activity, ...profileData } = profile
+      return profileData
+    })
+
     // Apply compatibility algorithm if enabled
     if (filters.compatibilityMode && swipeLimits.isPremium) {
-      const sortedProfiles = await applyCompatibilityAlgorithm(baseProfiles)
+      const sortedProfiles = await applyCompatibilityAlgorithm(transformedProfiles)
       return sortedProfiles.slice(0, limit)
     }
 
-    return baseProfiles.slice(0, limit)
+    return transformedProfiles.slice(0, limit)
   }
 
   const applyCompatibilityAlgorithm = async (profiles: Profile[]): Promise<Profile[]> => {
